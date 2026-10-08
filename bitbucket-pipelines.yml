@@ -8,8 +8,8 @@ pipelines:
           services:
             - docker
           script:
-            # 1. Extrai e salva a chave da Service Account de forma limpa
-            - python3 -c "import os, json; raw = os.environ.get('GCP_SA_KEY', '').strip(); data = json.loads(raw[raw.find('{'):raw.rfind('}')+1]); open('/tmp/key.json', 'w').write(json.dumps(data))"
+            # 1. Extrai cirurgicamente apenas o primeiro objeto JSON valido
+            - python3 -c "import os, json; raw = os.environ.get('GCP_SA_KEY', ''); start = raw.find('{'); data, _ = json.JSONDecoder().raw_decode(raw[start:]); open('/tmp/key.json', 'w').write(json.dumps(data))"
             - gcloud auth activate-service-account --key-file=/tmp/key.json
             - gcloud config set project $GCP_PROJECT_ID
             - export REGION="${GCP_REGION:-us-central1}"
