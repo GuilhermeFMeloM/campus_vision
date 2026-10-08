@@ -1,0 +1,61 @@
+{% extends "app/base.html" %}
+{% block content %}
+{% load custom_filters %}
+{% load static %}
+<div class="row">
+   <div class="col-md-6">
+      <form action="{% url 'edit' slide_id %}" method="POST">
+         {% csrf_token %}
+         <div class="mb-3">
+            <label for="title_text" class="form-label font-weight-bold">Título do Slide:</label>
+            <input class="form-control" id="title_text" type="text" value="{{ slide.title }}" name="title_text" required>
+         </div>
+         <div class="mb-3">
+            <label for="reading_time" class="form-label font-weight-bold">Tempo de Exibição (Segundos):</label>
+            <input class="form-control" id="reading_time" type="number" min="3" max="3600" value="{{ slide.reading_time|default:10 }}" name="reading_time" required>
+            {% if slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
+               <small class="text-primary font-weight-bold"><i class="fa fa-video-camera"></i> Este slide é um vídeo. O tempo configurado reflete a duração do vídeo.</small>
+            {% endif %}
+         </div>
+         <div class="row">
+            <div class="col-md-6 mb-3">
+               <label for="time_start" class="form-label font-weight-bold">Data Início:</label>
+               <input class="form-control" id="time_start" type="date" value="{{ slide.time_start }}" name="time_start" required>
+            </div>
+            <div class="col-md-6 mb-3">
+               <label for="time_end" class="form-label font-weight-bold">Data Fim:</label>
+               <input class="form-control" id="time_end" type="date" value="{{ slide.time_end }}" name="time_end" required>
+            </div>
+         </div>
+         <div class="mb-3">
+            <label class="form-label font-weight-bold">Equipamentos / Feeds:</label>
+            {% for feed in feeds %}
+            <div class="form-check">
+               <input class="form-check-input" type="checkbox" value="{{feed}}" name="feeds" id="feed_{{forloop.counter}}" {% if feed in slide.feeds %}checked{% endif %}>
+               <label class="form-check-label" for="feed_{{forloop.counter}}">{{feed}}</label>
+            </div>
+            {% endfor %}
+         </div>
+         <button class="btn btn-primary" type="submit">Salvar Alterações</button>
+         <a href="{% url 'manager' %}" class="btn btn-secondary">Cancelar</a>
+      </form>
+   </div>
+   <div class="col-md-6 text-center">
+      <h6 class="text-muted mb-3">Pré-visualização do Conteúdo</h6>
+      {% if slide.slide_path|startswith:"http" %}
+         <div class="w-100 rounded shadow-sm border p-2 bg-light text-start mb-2">
+            <small class="text-muted d-block">URL do Painel:</small>
+            <a href="{{ slide.slide_path }}" target="_blank" class="small text-truncate d-block">{{ slide.slide_path }}</a>
+         </div>
+         <iframe src="{{ slide.slide_path }}" class="w-100 rounded shadow-sm border-0" style="height: 380px; background: #fff;" allow="autoplay; fullscreen; encrypted-media"></iframe>
+      {% elif slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
+         <video class="w-100 rounded shadow-sm" controls playsinline style="max-height: 380px; background: #000;">
+            <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
+            Seu navegador não suporta vídeos.
+         </video>
+      {% else %}
+         <img src="{% static 'uploads/' %}{{ slide.slide_path }}" class="img-fluid rounded shadow-sm" style="max-height: 380px;">
+      {% endif %}
+   </div>
+</div>
+{% endblock %}

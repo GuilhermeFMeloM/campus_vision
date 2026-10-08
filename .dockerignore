@@ -1,0 +1,15 @@
+.git
+.gitignore
+.dockerignore
+DEV/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.DS_Store
+instance/
+docs/
+.deepsource.toml

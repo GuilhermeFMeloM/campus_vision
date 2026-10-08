@@ -1,0 +1,66 @@
+{% extends "app/base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-md-5">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fa fa-envelope"></i> Nova Mensagem Informativa</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'messages' %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="message_text" class="form-label font-weight-bold">Conteúdo da Mensagem:</label>
+            <textarea class="form-control" id="message_text" name="message_text" rows="3" placeholder="Ex: Palestra sobre Inovação nesta quinta às 19h no auditório." required></textarea>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="time_start" class="form-label font-weight-bold">Data Início:</label>
+              <input type="date" class="form-control" id="time_start" name="time_start" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="time_end" class="form-label font-weight-bold">Data Fim:</label>
+              <input type="date" class="form-control" id="time_end" name="time_end" required>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Cadastrar Mensagem</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="fa fa-list"></i> Mensagens Cadastradas</h5>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-striped table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Texto</th>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Autor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for msg in messages %}
+              <tr>
+                <td>{{ msg.text }}</td>
+                <td>{{ msg.time_start }}</td>
+                <td>{{ msg.time_end }}</td>
+                <td><small class="text-muted">{{ msg.submitted_by }}</small></td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="text-center py-4 text-muted">Nenhuma mensagem ativa.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

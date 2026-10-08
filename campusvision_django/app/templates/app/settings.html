@@ -1,0 +1,38 @@
+{% extends "app/base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fa fa-cogs"></i> Configurações Gerais do Sistema</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'settings' %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="duration" class="form-label font-weight-bold">Tempo Padrão de Exibição de Slide (Milissegundos):</label>
+            <input type="number" class="form-control" id="duration" value="{{ settings.duration }}" name="duration" required>
+            <small class="text-muted">Ex: 10000 = 10 segundos.</small>
+          </div>
+
+          <div class="mb-3">
+            <label for="allow_signups" class="form-label font-weight-bold">Permitir Cadastro de Novos Usuários:</label>
+            <select class="form-select" id="allow_signups" name="allow_signups">
+              <option value="1" {% if settings.allow_signups == 1 %}selected{% endif %}>Sim (Ativo)</option>
+              <option value="0" {% if settings.allow_signups == 0 %}selected{% endif %}>Não (Bloqueado)</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="feeds" class="form-label font-weight-bold">Lista de Feeds / Salas Disponíveis:</label>
+            <input type="text" class="form-control" id="feeds" value="{{ settings.feeds }}" name="feeds" required>
+            <small class="text-muted">Formato: ['Default', 'Recepcao', 'Refeitorio', 'Comercial']</small>
+          </div>
+
+          <button class="btn btn-primary" type="submit">Salvar Configurações</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "app/base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fa fa-user"></i> Meu Perfil</h5>
+      </div>
+      <div class="card-body">
+        <h4 class="mb-3">Olá, <strong>{{ name }}</strong>!</h4>
+        <p class="text-muted">Você está conectado ao sistema CampusVision de sinalização digital.</p>
+        <hr>
+        <a href="{% url 'manager' %}" class="btn btn-outline-primary">
+          <i class="fa fa-tasks"></i> Meus Slides
+        </a>
+        <a href="{% url 'logout' %}" class="btn btn-danger float-end">
+          <i class="fa fa-sign-out"></i> Sair do Sistema
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

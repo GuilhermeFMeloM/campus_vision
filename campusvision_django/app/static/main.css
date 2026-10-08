@@ -1,0 +1,137 @@
+html {
+    font-size: 100%;
+    box-sizing: border-box;
+}
+
+.main-body {
+    background: #1a1a1a;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+.btn-primary, .side-nav {
+    color: white;
+    background-color: #3e1952;
+    border: none;
+}
+
+.btn-primary:hover, .side-nav:hover, nav-link.active {
+    color: white;
+    border: none;
+}
+
+.side-nav.active {
+    color: black !important;
+    background-color: white !important;
+    border: none !important;
+}
+
+.nav-pills .nav-link {
+    color: #d4d4d4;
+    margin-right: 10px;
+    margin-left: 10px;
+    border-radius: 12px;
+}
+
+.app-title {
+    height: 50px;
+    padding: 10px;
+    margin-bottom: 0rem;
+    padding-left: 25px;
+    background: #1a1a1a;
+}
+
+.topnav {
+    height: 50px;
+    background: #3e1952;
+    color: white;
+    background: #1a1a1a;
+}
+.topnav a {
+    color: white;
+    text-align: center;
+    padding-top: 0px;
+    padding-bottom: 0px;
+}
+
+.sidebar {
+    background: #1a1a1a;
+    width: 280px;
+    min-height: 100vh;
+}
+
+.side-nav i {
+    padding: 8px;
+}
+
+.content-box {
+    border-radius: 12px 0px 0px 12px;
+    min-height: 95vh;
+    background: white;
+}
+
+.btn-outline-primary {
+    color: #3e1952;
+    border-color: #3e1952;
+}
+
+.btn-outline-primary:hover {
+    color: black;
+    background-color: #e3bf42;
+    border-color: #e3bf42;
+}
+
+.badge-info {
+    background-color: grey;
+}
+.signs li {
+    margin: auto;
+    padding: 3px;
+}
+
+.bottom-nav {
+    display: flex;
+    margin-left: 10px;
+}
+.bottom-nav a {
+    padding: 8px;
+    color: white;
+}
+
+@font-face {
+    font-family: 'Myriad Pro Light';
+    src: url('fonts/MyriadPro-Light.woff2') format('woff2'),
+        url('fonts/MyriadPro-Light.woff') format('woff');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro Cond';
+    src: url('fonts/MyriadPro-Cond.woff2') format('woff2'),
+        url('fonts/MyriadPro-Cond.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro';
+    src: url('fonts/MyriadPro-Regular.woff2') format('woff2'),
+        url('fonts/MyriadPro-Regular.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Myriad Pro Semibold Cond';
+    src: url('fonts/MyriadPro-SemiboldCond.woff2') format('woff2'),
+        url('fonts/MyriadPro-SemiboldCond.woff') format('woff');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}

@@ -1,0 +1,116 @@
+{% extends "app/base.html" %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<ul class="nav nav-tabs">
+  <li class="nav-item">
+    <a class="nav-link {% if request.path == '/manager' %}active{% endif %}" aria-current="page" href="{% url 'manager' %}">All</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.path == '/manager/approved' %}active{% endif %}" href="{% url 'manager_approved' %}">Aprovados</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.path == '/manager/waiting' %}active{% endif %}" href="{% url 'manager_waiting' %}">Aguardando Analíse</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.path == '/manager/denied' %}active{% endif %}" href="{% url 'manager_denied' %}">Negado</a>
+  </li>
+</ul>
+<br>
+<table id="data" class="table table-striped align-middle">
+  <thead>
+    <tr>
+        <th>Titulo</th>
+        <th>Nome do Arquivo</th>
+        <th>url</th>
+        <th>Inicio</th>
+        <th>Fim</th>
+        <th>Duração</th>
+        <th>Equipamentos</th>
+        <th>Prévia</th>
+        <th>Autor</th>
+        <th>Status</th>
+        <th>Configurações</th>
+      </tr>
+  </thead>
+  <tbody>
+      {% for user in users %}
+        {% if user.approval in filter %}
+          <tr>
+            <td><strong>{{ user.title }}</strong></td>
+            <td><small class="text-muted">{{ user.slide_path }}</small></td>
+
+            <td width="100px">
+              <a href="/feeds/Default/" target="_blank" class="btn btn-outline-primary btn-sm">
+                <i class="fa fa-tv"></i> Ver TV
+              </a>
+            </td>
+            
+            <td>{{ user.time_start }}</td>
+            <td>{{ user.time_end }}</td>
+            <td>
+              {% if user.slide_path|startswith:"http" %}
+                <span class="badge bg-info text-dark"><i class="fa fa-dashboard"></i> {{ user.reading_time|default:20 }}s</span>
+              {% elif user.slide_path|endswith:".mp4" or user.slide_path|endswith:".webm" %}
+                <span class="badge bg-primary"><i class="fa fa-video-camera"></i> {{ user.reading_time|default:10 }}s</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ user.reading_time|default:10 }}s</span>
+              {% endif %}
+            </td>
+            <td>
+              {% for feed in user.feeds_list %}
+                <span class="badge bg-light text-dark border">{{ feed }}</span><br>
+              {% empty %}
+                <small class="text-muted">Todos</small>
+              {% endfor %}
+            </td>
+            <td>
+              {% if user.slide_path|startswith:"http" %}
+                <a href="{{ user.slide_path }}" target="_blank" class="rounded bg-dark text-info d-flex flex-column align-items-center justify-content-center p-1 text-center text-decoration-none shadow-sm" style="height: 60px; width: 90px;" title="Abrir Painel em nova aba">
+                  <i class="fa fa-dashboard fa-lg mb-1 text-warning"></i>
+                  <span style="font-size: 0.65rem; color: #94a3b8;">Abrir Painel</span>
+                </a>
+              {% elif user.slide_path|endswith:".mp4" or user.slide_path|endswith:".webm" %}
+                <div class="rounded bg-dark text-white d-flex align-items-center justify-content-center p-2 text-center shadow-sm" style="height: 60px; width: 90px;">
+                  <i class="fa fa-play-circle fa-2x text-warning"></i>
+                </div>
+              {% else %}
+                <img src="{% static 'uploads/' %}{{ user.slide_path }}" class="rounded shadow-sm" style='height: 60px; width: 90px; object-fit: cover;'>
+              {% endif %}
+            </td>
+            <td><small>{{ user.submitted_by }}</small></td>
+            <td>
+              {% if user.approval == 'Approved' %}
+                <span class="badge bg-success">Aprovado</span>
+              {% elif user.approval == 'Waiting Review' %}
+                <span class="badge bg-warning text-dark">Em Análise</span>
+              {% else %}
+                <span class="badge bg-danger">Recusado</span>
+              {% endif %}
+            </td>
+            <td width="100px">
+              <a href="{% url 'edit' user.id %}" class="btn btn-outline-dark btn-sm">
+                <i class="fa fa-pencil"></i> Editar
+              </a>
+            </td>
+          </tr>
+        {% endif %}
+      {% empty %}
+        <tr>
+          <td colspan="11" class="text-center py-4 text-muted">Nenhum slide encontrado.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+</table>
+<nav aria-label="Page navigation example">
+  <ul class="pagination">
+    {% if prev_url %}
+    <li class="page-item"><a class="page-link" href="{{ prev_url }}">Newer Slides</a></li>
+    {% endif %}
+    {% if next_url %}
+    <li class="page-item"><a class="page-link" href="{{ next_url }}">Older Slides</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endblock %}

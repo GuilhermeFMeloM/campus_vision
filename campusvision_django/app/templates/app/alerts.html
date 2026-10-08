@@ -1,0 +1,41 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card border-danger shadow-sm">
+      <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="fa fa-exclamation-triangle"></i> Alerta de Emergência da TV</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'alerts' %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="alert_text" class="form-label font-weight-bold">Texto do Alerta Geral:</label>
+            <textarea class="form-control" id="alert_text" name="alert_text" rows="3" placeholder="Ex: ATENÇÃO: Evacuação do prédio devido a teste do alarme de incêndio.">{{ alert_text }}</textarea>
+            <small class="text-muted">Este texto passará em destaque na barra inferior de todas as TVs.</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label font-weight-bold d-block">Status do Alerta:</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="alert_status" id="Enable" value="Enable" {% if alert_text %}checked{% endif %}>
+              <label class="form-check-label text-danger font-weight-bold" for="Enable">Ativar Alerta</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="alert_status" id="Disable" value="Disable" {% if not alert_text %}checked{% endif %}>
+              <label class="form-check-label text-success font-weight-bold" for="Disable">Desativar Alerta</label>
+            </div>
+          </div>
+
+          <div class="alert alert-warning py-2">
+            <i class="fa fa-info-circle"></i> <strong>Aviso:</strong> O alerta sobrepõe os informativos comuns e é transmitido instantaneamente para todas as telas conectadas.
+          </div>
+
+          <button class="btn btn-danger" type="submit">Salvar Status do Alerta</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "app/base.html" %}
+{% load static %}
+
+{% block content %}
+<form method="POST" action="{% url 'configuration_equipment' %}">
+    {% csrf_token %}
+    <br>
+    <h3>Cadastrar Equipamento / Ponto de TV</h3>
+    <div class="mb-3">
+        <label for="message_text" class="form-label">Nome do Equipamento / Feed</label>
+        <input type="text" class="form-control" id="message_text" name="message_text" placeholder="Ex: TV Recepção Prédio A" required>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Cadastrar</button>
+</form>
+<br>
+
+<div class="container">
+    <h3>Service Desk Operational Status</h3>
+    <div class="row">
+        {% for feedstatus in rooms %}
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">{{ feedstatus.feed_name }}</h5>
+                    {% if feedstatus.is_recently_updated == 1 %}
+                    <span class="badge bg-success">Online</span>
+                    {% elif feedstatus.is_recently_updated == 0 %}
+                    <span class="badge bg-danger">Offline</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Problem</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <br>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="list-group">
+                <div class="list-group-item">
+                    <h5 class="list-group-item-heading">
+                        Event Management
+                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access website and use site API">
+                            <i class="fa fa-question-circle"></i>
+                        </a>
+                    </h5>
+                    <p class="list-group-item-text">
+                        <span class="badge bg-success">Operational</span>
+                    </p>
+                </div>
+                <div class="list-group-item">
+                    <h5 class="list-group-item-heading">
+                        Transact
+                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access site using SSH terminal">
+                            <i class="fa fa-question-circle"></i>
+                        </a>
+                    </h5>
+                    <p class="list-group-item-text">
+                        <span class="badge bg-success">Operational</span>
+                    </p>
+                </div>
+                <div class="list-group-item">
+                    <h5 class="list-group-item-heading">
+                        Campus Dorm Services
+                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access database server and execute queries">
+                            <i class="fa fa-question-circle"></i>
+                        </a>
+                    </h5>
+                    <p class="list-group-item-text">
+                        <span class="badge bg-success">Operational</span>
+                    </p>
+                </div>
+                <div class="list-group-item">
+                    <h5 class="list-group-item-heading">
+                        Chapel
+                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access database server and execute queries">
+                            <i class="fa fa-question-circle"></i>
+                        </a>
+                    </h5>
+                    <p class="list-group-item-text">
+                        <span class="badge bg-success">Operational</span>
+                    </p>
+                </div>
+                <div class="list-group-item">
+                    <h5 class="list-group-item-heading">
+                        External Communication
+                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="KB, Documentation, Newsletter, Social Media, Bookings, Email, PR">
+                            <i class="fa fa-question-circle"></i>
+                        </a>
+                    </h5>
+                    <p class="list-group-item-text">
+                        <span class="badge bg-success">Operational</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,319 @@
+{% extends "app/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="row">
+    <!-- Formulário de Cadastro de Slide / Vídeo / Embed -->
+    <div class="col-lg-6 col-md-12 mb-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-3">
+          <h5 class="mb-0 font-weight-bold"><i class="fa fa-cloud-upload"></i> Novo Conteúdo para as TVs</h5>
+        </div>
+        <div class="card-body p-4">
+          <form action="{% url 'upload' %}" method="POST" enctype="multipart/form-data" id="uploadForm">
+            {% csrf_token %}
+
+            <!-- 1. Seleção do Tipo de Conteúdo (Imagem, Vídeo ou Painel Web) -->
+            <div class="mb-3">
+              <label class="form-label font-weight-bold d-block">Tipo de Conteúdo:</label>
+              <div class="btn-group w-100" role="group" aria-label="Tipo de Mídia">
+                <input type="radio" class="btn-check" name="media_type" id="typeImage" value="image" checked autocomplete="off" onchange="handleMediaTypeChange()">
+                <label class="btn btn-outline-primary py-2 font-weight-bold" for="typeImage">
+                  <i class="fa fa-picture-o"></i> Imagem
+                </label>
+
+                <input type="radio" class="btn-check" name="media_type" id="typeVideo" value="video" autocomplete="off" onchange="handleMediaTypeChange()">
+                <label class="btn btn-outline-primary py-2 font-weight-bold" for="typeVideo">
+                  <i class="fa fa-video-camera"></i> Vídeo
+                </label>
+
+                <input type="radio" class="btn-check" name="media_type" id="typeEmbed" value="embed" autocomplete="off" onchange="handleMediaTypeChange()">
+                <label class="btn btn-outline-primary py-2 font-weight-bold" for="typeEmbed">
+                  <i class="fa fa-dashboard"></i> Painel / Embed
+                </label>
+              </div>
+            </div>
+
+            <!-- 2. Seleção de Arquivo (Para Imagem / Vídeo) -->
+            <div class="mb-3" id="fileInputContainer">
+              <label for="file" class="form-label font-weight-bold" id="fileLabel">Arquivo de Imagem:</label>
+              <input class="form-control" type="file" id="file" name="file" onchange="handleFileSelection(event)" accept="image/*" />
+              <small class="text-muted d-block mt-1" id="fileHelp">Formatos aceitos: .jpg, .jpeg, .png, .webp</small>
+            </div>
+
+            <!-- 2.1 Campo de URL Embed (Para Painéis do Power BI, Grafana, etc) -->
+            <div class="mb-3 d-none" id="embedInputContainer">
+              <label for="embed_url" class="form-label font-weight-bold">URL do Painel / Dashboard:</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fa fa-link"></i></span>
+                <input type="url" class="form-control" id="embed_url" name="embed_url" placeholder="https://app.powerbi.com/view?r=... ou https://grafana..." oninput="handleEmbedUrlChange(this.value)">
+              </div>
+              <small class="text-muted d-block mt-1">Insira o link de incorporação (embed) público ou liberado para a TV.</small>
+            </div>
+
+            <!-- 3. Título -->
+            <div class="mb-3">
+              <label for="title" class="form-label font-weight-bold">Título / Nome do Slide:</label>
+              <input class="form-control" id="title" type="text" placeholder="Ex: Painel de Vendas ou Campanha Institucional" name="title" required>
+            </div>
+
+            <!-- 4. Período de Exibição -->
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="time_start" class="form-label font-weight-bold">Data Início:</label>
+                <input class="form-control" type="date" id="time_start" name="time_start" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="time_end" class="form-label font-weight-bold">Data Fim:</label>
+                <input class="form-control" type="date" id="time_end" name="time_end" required>
+              </div>
+            </div>
+
+            <!-- 5. Tempo de Exibição -->
+            <div class="mb-3">
+              <label for="reading_time" class="form-label font-weight-bold">Tempo de Exibição (Segundos):</label>
+              <input class="form-control" type="number" id="reading_time" name="reading_time" min="3" max="3600" value="10" required>
+              
+              <!-- Badge informativa quando vídeo for detectado -->
+              <div id="videoDurationInfo" class="alert alert-info py-2 px-3 mt-2 d-none" style="font-size: 0.9rem;">
+                <i class="fa fa-info-circle"></i> <strong id="videoDurationText">Duração do vídeo detectada: 0s</strong> (A TV exibirá o vídeo até o final).
+              </div>
+              <small class="text-muted" id="readingTimeHelp">Defina quantos segundos o slide ficará visível na TV.</small>
+            </div>
+
+            <!-- 6. Telas / Feeds de Exibição -->
+            <div class="mb-4">
+              <label class="form-label font-weight-bold">Equipamentos / Telas de Exibição:</label>
+              <div class="p-3 border rounded bg-light">
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="checkAll" onClick="toggle(this)"/>
+                  <label class="form-check-label font-weight-bold text-primary" for="checkAll">
+                    <i class="fa fa-check-square-o"></i> Selecionar Todas as Telas
+                  </label>
+                </div>
+                <hr class="my-2">
+                <div class="row">
+                  {% for feed in feeds %}
+                  <div class="col-md-6 mb-1">
+                    <div class="form-check">
+                      <input class="form-check-input feed-checkbox" type="checkbox" value="{{feed}}" name="feeds" id="feed_{{forloop.counter}}">
+                      <label class="form-check-label" for="feed_{{forloop.counter}}">
+                        <i class="fa fa-tv text-secondary"></i> {{feed}}
+                      </label>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-lg w-100 font-weight-bold shadow-sm" type="submit">
+              <i class="fa fa-paper-plane"></i> Enviar para Moderação
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Painel de Pré-visualização Lateral -->
+    <div class="col-lg-6 col-md-12">
+      <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+        <div class="card-header bg-dark text-white py-3">
+          <h5 class="mb-0"><i class="fa fa-eye"></i> Pré-visualização em Tempo Real</h5>
+        </div>
+        <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center" style="min-height: 440px; background-color: #0b0f19;">
+          
+          <div id="previewPlaceholder" class="text-muted p-4">
+            <i class="fa fa-television fa-4x mb-3 text-secondary"></i>
+            <h5>Nenhum conteúdo selecionado</h5>
+            <p class="small text-muted mb-0">Selecione uma imagem, vídeo ou digite uma URL de painel para visualizar a prévia.</p>
+          </div>
+
+          <!-- Preview de Imagem -->
+          <img id="imagePreview" class="img-fluid rounded shadow-lg d-none" style="max-height: 460px; object-fit: contain;" alt="Prévia do Slide" />
+
+          <!-- Preview de Vídeo -->
+          <div id="videoPreviewContainer" class="w-100 d-none">
+            <video id="videoPreview" class="w-100 rounded shadow-lg" controls playsinline style="max-height: 460px; background: #000;">
+              Seu navegador não suporta a tag de vídeo.
+            </video>
+          </div>
+
+          <!-- Preview de Embed Iframe -->
+          <div id="embedPreviewContainer" class="w-100 h-100 d-none" style="min-height: 440px;">
+            <iframe id="embedPreview" src="" class="w-100 h-100 rounded shadow-lg border-0" style="min-height: 440px; background: #fff;" allow="autoplay; fullscreen; encrypted-media"></iframe>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Elementos do DOM
+  const fileInputContainer = document.getElementById('fileInputContainer');
+  const embedInputContainer = document.getElementById('embedInputContainer');
+  const fileInput = document.getElementById('file');
+  const fileLabel = document.getElementById('fileLabel');
+  const fileHelp = document.getElementById('fileHelp');
+  const embedUrlInput = document.getElementById('embed_url');
+
+  const readingTimeInput = document.getElementById('reading_time');
+  const readingTimeHelp = document.getElementById('readingTimeHelp');
+  const videoDurationInfo = document.getElementById('videoDurationInfo');
+  const videoDurationText = document.getElementById('videoDurationText');
+
+  const previewPlaceholder = document.getElementById('previewPlaceholder');
+  const imagePreview = document.getElementById('imagePreview');
+  const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+  const videoPreview = document.getElementById('videoPreview');
+  const embedPreviewContainer = document.getElementById('embedPreviewContainer');
+  const embedPreview = document.getElementById('embedPreview');
+
+  // Alterna entre Imagem, Vídeo e Embed
+  function handleMediaTypeChange() {
+    const isVideo = document.getElementById('typeVideo').checked;
+    const isEmbed = document.getElementById('typeEmbed').checked;
+    
+    fileInput.value = '';
+    embedUrlInput.value = '';
+    resetPreviews();
+
+    if (isEmbed) {
+      fileInputContainer.classList.add('d-none');
+      fileInput.required = false;
+      embedInputContainer.classList.remove('d-none');
+      embedUrlInput.required = true;
+
+      readingTimeInput.readOnly = false;
+      readingTimeInput.value = 20;
+      readingTimeHelp.innerText = 'Defina por quantos segundos o painel web/dashboard será exibido antes de passar para o próximo slide.';
+    } else if (isVideo) {
+      fileInputContainer.classList.remove('d-none');
+      fileInput.required = true;
+      fileInput.accept = 'video/mp4,video/webm,video/*';
+      fileLabel.innerText = 'Arquivo de Vídeo (.mp4, .webm):';
+      fileHelp.innerText = 'Formatos aceitos: .mp4, .webm (A duração será detectada automaticamente)';
+      embedInputContainer.classList.add('d-none');
+      embedUrlInput.required = false;
+
+      readingTimeHelp.innerText = 'Para vídeos, a duração é sincronizada automaticamente com o arquivo.';
+    } else {
+      // Imagem
+      fileInputContainer.classList.remove('d-none');
+      fileInput.required = true;
+      fileInput.accept = 'image/*,.jpg,.jpeg,.png,.webp';
+      fileLabel.innerText = 'Arquivo de Imagem:';
+      fileHelp.innerText = 'Formatos aceitos: .jpg, .jpeg, .png, .webp';
+      embedInputContainer.classList.add('d-none');
+      embedUrlInput.required = false;
+
+      readingTimeInput.readOnly = false;
+      readingTimeInput.value = 10;
+      readingTimeHelp.innerText = 'Defina quantos segundos o slide ficará visível na TV.';
+    }
+  }
+
+  // Processa o arquivo selecionado
+  function handleFileSelection(event) {
+    const file = event.target.files[0];
+    if (!file) {
+      resetPreviews();
+      return;
+    }
+
+    const isVideo = file.type.startsWith('video/') || file.name.match(/\.(mp4|webm|mov)$/i);
+    const objectUrl = URL.createObjectURL(file);
+
+    const titleInput = document.getElementById('title');
+    if (!titleInput.value) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+      titleInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+    }
+
+    if (isVideo) {
+      document.getElementById('typeVideo').checked = true;
+      
+      videoPreview.src = objectUrl;
+      videoPreview.onloadedmetadata = function() {
+        const durationSec = Math.ceil(videoPreview.duration) || 10;
+        readingTimeInput.value = durationSec;
+        readingTimeInput.readOnly = true;
+
+        videoDurationText.innerText = `Duração do vídeo: ${durationSec} segundos detectados automaticamente.`;
+        videoDurationInfo.classList.remove('d-none');
+      };
+
+      previewPlaceholder.classList.add('d-none');
+      imagePreview.classList.add('d-none');
+      embedPreviewContainer.classList.add('d-none');
+      videoPreviewContainer.classList.remove('d-none');
+    } else {
+      document.getElementById('typeImage').checked = true;
+      imagePreview.src = objectUrl;
+
+      readingTimeInput.readOnly = false;
+      if (parseInt(readingTimeInput.value) > 60 || parseInt(readingTimeInput.value) <= 0) {
+        readingTimeInput.value = 10;
+      }
+      videoDurationInfo.classList.add('d-none');
+
+      previewPlaceholder.classList.add('d-none');
+      videoPreviewContainer.classList.add('d-none');
+      embedPreviewContainer.classList.add('d-none');
+      imagePreview.classList.remove('d-none');
+    }
+  }
+
+  // Processa a URL do Embed digitada
+  let embedTimeout = null;
+  function handleEmbedUrlChange(url) {
+    clearTimeout(embedTimeout);
+    if (!url || !url.startsWith('http')) {
+      resetPreviews();
+      return;
+    }
+
+    embedTimeout = setTimeout(() => {
+      embedPreview.src = url;
+      previewPlaceholder.classList.add('d-none');
+      imagePreview.classList.add('d-none');
+      videoPreviewContainer.classList.add('d-none');
+      embedPreviewContainer.classList.remove('d-none');
+
+      const titleInput = document.getElementById('title');
+      if (!titleInput.value) {
+        titleInput.value = "Painel / Dashboard Web";
+      }
+    }, 500);
+  }
+
+  function resetPreviews() {
+    previewPlaceholder.classList.remove('d-none');
+    imagePreview.classList.add('d-none');
+    videoPreviewContainer.classList.add('d-none');
+    embedPreviewContainer.classList.add('d-none');
+    videoPreview.src = '';
+    imagePreview.src = '';
+    embedPreview.src = '';
+    videoDurationInfo.classList.add('d-none');
+  }
+
+  function toggle(source) {
+    const checkboxes = document.querySelectorAll('.feed-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const nextMonth = new Date();
+    nextMonth.setDate(today.getDate() + 30);
+
+    const formatDate = (d) => d.toISOString().split('T')[0];
+    document.getElementById('time_start').value = formatDate(today);
+    document.getElementById('time_end').value = formatDate(nextMonth);
+  });
+</script>
+{% endblock %}

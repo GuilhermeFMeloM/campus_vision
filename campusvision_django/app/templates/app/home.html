@@ -1,0 +1,156 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<!-- Cards de Resumo Operacional -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-primary border-4">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px;">Total de TVs / Pontos</h6>
+                    <h2 class="mb-0 font-weight-bold text-dark">{{ total_tvs }}</h2>
+                </div>
+                <div class="p-3 bg-light rounded-circle text-primary">
+                    <i class="fa fa-television fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-success border-4">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px;">TVs Ligadas (Online)</h6>
+                    <h2 class="mb-0 font-weight-bold text-success">{{ online_tvs }}</h2>
+                </div>
+                <div class="p-3 bg-light rounded-circle text-success">
+                    <i class="fa fa-check-circle fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-secondary border-4">
+            <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem; letter-spacing: 0.5px;">Aguardando Moderação</h6>
+                    <h2 class="mb-0 font-weight-bold text-warning">{{ mod_count }}</h2>
+                </div>
+                <div class="p-3 bg-light rounded-circle text-warning">
+                    <i class="fa fa-hourglass-half fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Painel das TVs e Equipamentos -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0"><i class="fa fa-desktop text-primary me-2"></i> Monitoramento e Links Individuais de cada TV</h5>
+        <a href="{% url 'settings' %}" class="btn btn-outline-light btn-sm">
+            <i class="fa fa-plus-circle"></i> Gerenciar Pontos / Feeds
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 250px;">Nome da TV / Ponto</th>
+                        <th>Status Operacional</th>
+                        <th>Programação Ativa</th>
+                        <th>Último Sinal (Heartbeat)</th>
+                        <th class="text-end">Links de Transmissão</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for feed in feed_details %}
+                    <tr>
+                        <td>
+                            <strong class="fs-6">{{ feed.name }}</strong>
+                            <br>
+                            <small class="text-muted">ID: {{ feed.name|slugify }}</small>
+                        </td>
+                        <td>
+                            {% if feed.is_online %}
+                                <span class="badge bg-success p-2">
+                                    <i class="fa fa-circle text-white me-1"></i> LIGADA / ONLINE
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger p-2">
+                                    <i class="fa fa-power-off text-white me-1"></i> DESLIGADA / OFFLINE
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info text-dark">
+                                <i class="fa fa-film"></i> {{ feed.slides_count }} slide(s) vinculados
+                            </span>
+                        </td>
+                        <td>
+                            {% if feed.last_access %}
+                                <small class="text-muted">{{ feed.last_access|date:"d/m/Y H:i:s" }}</small>
+                            {% else %}
+                                <small class="text-muted">Nenhum acesso recente</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ feed.url_horizontal }}" target="_blank" class="btn btn-primary btn-sm me-1" title="Abrir transmissão padrão (Horizontal 16:9)">
+                                <i class="fa fa-play-circle me-1"></i> Abrir TV (Horizontal)
+                            </a>
+                            <a href="{{ feed.url_vertical }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Abrir transmissão para Totem (Vertical 9:16)">
+                                <i class="fa fa-mobile me-1"></i> Totem (Vertical)
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            Nenhum ponto de TV cadastrado. Adicione nas <a href="{% url 'settings' %}">Configurações</a>.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Orientações e Políticas -->
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0 font-weight-bold"><i class="fa fa-info-circle text-primary"></i> Como funciona o conteúdo por TV</h6>
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted">
+                    Cada TV deve ser configurada no seu navegador (Smart TV, Raspberry Pi, Android TV, etc.) com a sua respectiva URL única listada acima.
+                </p>
+                <ul class="text-secondary small mb-0">
+                    <li>Ao criar ou editar um slide em <strong>Novo Slide</strong>, você escolhe exatamente em quais TVs ele deve rodar.</li>
+                    <li>Conteúdos direcionados para a <em>Recepção</em> não aparecerão no <em>Refeitório</em> a menos que selecionados.</li>
+                    <li>As TVs atualizam novos slides, notícias, previsão do tempo e ônibus a cada 30 segundos em segundo plano.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-3">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-light">
+                <h6 class="mb-0 font-weight-bold"><i class="fa fa-check-square-o text-success"></i> Padrões Recomendados</h6>
+            </div>
+            <div class="card-body">
+                <ul class="text-secondary small mb-0">
+                    <li><strong>Proporção:</strong> 16:9 (Horizontal) ou 9:16 (Totem Vertical).</li>
+                    <li><strong>Resolução Recomendada:</strong> 1920x1080 (Full HD) ou 3840x2160 (4K).</li>
+                    <li><strong>Formatos:</strong> Imagens em JPG, PNG, WEBP ou Vídeos em MP4.</li>
+                    <li><strong>Tempo de Leitura:</strong> Configure entre 8 a 15 segundos para boa leitura.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

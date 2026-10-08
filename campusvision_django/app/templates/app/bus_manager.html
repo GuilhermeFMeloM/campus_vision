@@ -1,0 +1,137 @@
+{% extends "app/base.html" %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-4 mb-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-warning text-dark font-weight-bold">
+        <h5 class="mb-0"><i class="fa fa-plus-circle"></i> Cadastrar Linha / Horário</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'bus_manager' %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add">
+          
+          <div class="mb-3">
+            <label for="line_number" class="form-label font-weight-bold">Número / Nome da Linha:</label>
+            <input type="text" class="form-control" id="line_number" name="line_number" placeholder="Ex: 809U-10 ou Circular 1" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="destination" class="form-label font-weight-bold">Destino / Itinerário:</label>
+            <input type="text" class="form-control" id="destination" name="destination" placeholder="Ex: Metrô Butantã / Terminal Pinheiros" required>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="departure_time" class="form-label font-weight-bold">Previsão / Chegada:</label>
+              <input type="text" class="form-control" id="departure_time" name="departure_time" placeholder="Ex: 4 min ou 18:30" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="platform" class="form-label font-weight-bold">Ponto / Parada:</label>
+              <input type="text" class="form-control" id="platform" name="platform" value="Ponto Central">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="status" class="form-label font-weight-bold">Status do Ônibus:</label>
+            <select class="form-select" id="status" name="status">
+              <option value="A caminho">A caminho</option>
+              <option value="No horário" selected>No horário</option>
+              <option value="Atrasado">Atrasado</option>
+              <option value="No terminal">No terminal</option>
+            </select>
+          </div>
+
+          <button class="btn btn-warning w-100 font-weight-bold" type="submit">
+            <i class="fa fa-save"></i> Salvar Linha
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fa fa-bus text-warning"></i> Linhas Cadastradas no Painel da TV</h5>
+        <span class="badge bg-warning text-dark">{{ buses|length }} Linhas</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Linha</th>
+                <th>Destino</th>
+                <th>Tempo / Distância</th>
+                <th>Parada</th>
+                <th>Status</th>
+                <th>Exibir na TV</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for bus in buses %}
+                <tr>
+                  <td>
+                    <span class="badge bg-dark fs-6">{{ bus.line_number }}</span>
+                  </td>
+                  <td><strong>{{ bus.destination }}</strong></td>
+                  <td>
+                    <span class="badge bg-primary text-white fs-6">
+                      <i class="fa fa-clock-o"></i> {{ bus.departure_time }}
+                    </span>
+                  </td>
+                  <td><small class="text-muted">{{ bus.platform }}</small></td>
+                  <td>
+                    {% if bus.status == "A caminho" %}
+                      <span class="badge bg-success">{{ bus.status }}</span>
+                    {% elif bus.status == "No horário" %}
+                      <span class="badge bg-info text-dark">{{ bus.status }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">{{ bus.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <form method="POST" action="{% url 'bus_manager' %}" class="d-inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle">
+                      <input type="hidden" name="bus_id" value="{{ bus.id }}">
+                      {% if bus.is_active %}
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                          <i class="fa fa-check"></i> Ativo
+                        </button>
+                      {% else %}
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                          <i class="fa fa-times"></i> Oculto
+                        </button>
+                      {% endif %}
+                    </form>
+                  </td>
+                  <td class="text-end">
+                    <form method="POST" action="{% url 'bus_manager' %}" class="d-inline" onsubmit="return confirm('Remover esta linha de ônibus?')">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="bus_id" value="{{ bus.id }}">
+                      <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="fa fa-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" class="text-center py-4 text-muted">
+                    Nenhuma linha cadastrada. Preencha o formulário ao lado para adicionar.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
