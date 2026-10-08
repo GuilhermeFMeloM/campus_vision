@@ -1,37 +1,24 @@
-# =========================================================================
-# Bitbucket Pipelines - CI/CD Automatizado para o Google Cloud Run
-# =========================================================================
-image: google/cloud-sdk:alpine
+image: google/cloud-sdk:latest
 
 pipelines:
   branches:
     main:
       - step:
-          name: Deploy para Google Cloud Run
-          deployment: production
+          name: Build e Deploy no Cloud Run
           services:
             - docker
           script:
-            # 1. Autenticação com a Chave da Service Account do GCP
-            - echo $GCP_SA_KEY | base64 -d > /tmp/gcp-key.json
-            - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+            # 1. Salvar chave principal e autenticar na GCP
+            - echo "$GCP_SA_KEY" > /tmp/key.json
+            - gcloud auth activate-service-account --key-file=/tmp/key.json
             - gcloud config set project $GCP_PROJECT_ID
+            - export REGION="${GCP_REGION:-us-central1}"
+            - gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
 
-            # 2. Configura autenticação do Docker com o Artifact Registry
-            - gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev --quiet
-            - export IMAGE_NAME="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/campusvision-repo/campusvision:${BITBUCKET_COMMIT}"
+            # 2. Construir e enviar a imagem para o Artifact Registry
+            - export IMAGE="${REGION}-docker.pkg.dev/$GCP_PROJECT_ID/campusvision-repo/campusvision:$BITBUCKET_COMMIT"
+            - docker build -t $IMAGE .
+            - docker push $IMAGE
 
-            # 3. Build e envio da imagem Docker
-            - docker build -t $IMAGE_NAME .
-            - docker push $IMAGE_NAME
-
-            # 4. Deploy no Cloud Run
-            - gcloud run deploy campusvision \
-                --image $IMAGE_NAME \
-                --region $GCP_REGION \
-                --platform managed \
-                --allow-unauthenticated \
-                --port 8080 \
-                --memory 512Mi \
-                --cpu 1 \
-                --set-env-vars DJANGO_DEBUG=False
+            # 3. Deploy limpo no Cloud Run
+            - gcloud run deploy campusvision --image=$IMAGE --region=$REGION --port=8080 --memory=512Mi --cpu=1 --min-instances=0 --max-instances=3 --allow-unauthenticated --set-env-vars=GCP_PROJECT=$GCP_PROJECT_ID,DJANGO_DEBUG=False --quiet
