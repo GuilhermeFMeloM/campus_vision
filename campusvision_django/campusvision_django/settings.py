@@ -95,7 +95,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'campusvision',
         'USER': '2BDbWRGd19pMRok.root',
-        'PASSWORD': 'toq6IkM1OLL0Igxu',
+        'PASSWORD': 'L9GNXy4wztJ5n9GS',
         'HOST': 'gateway01.us-east-1.prod.aws.tidbcloud.com',
         'PORT': '4000',
         'OPTIONS': {
