@@ -90,21 +90,22 @@ WSGI_APPLICATION = 'campusvision_django.wsgi.application'
 # Database: Suporta Cloud SQL (Postgres / MySQL) via DATABASE_URL ou SQLite local/volume
 
  	
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
-    }
-    # Se for MySQL/TiDB, ativa o SSL compatível com PyMySQL
-    if 'mysql' in DATABASES['default'].get('ENGINE', ''):
-        DATABASES['default'].setdefault('OPTIONS', {})['ssl'] = {'check_hostname': False}
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'campusvision',
+        'USER': '2BDbWRGd19pMRok.root',
+        'PASSWORD': 'toq6IkM1OLL0Igxu',
+        'HOST': 'gateway01.us-east-1.prod.aws.tidbcloud.com',
+        'PORT': '4000',
+        'OPTIONS': {
+            'ssl': {
+                'ca': '/etc/ssl/certs/ca-certificates.crt' if os.path.exists('/etc/ssl/certs/ca-certificates.crt') else None,
+                'check_hostname': False,
+            }
         }
     }
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
