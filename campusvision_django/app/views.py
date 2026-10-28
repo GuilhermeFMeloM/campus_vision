@@ -516,4 +516,3 @@ def api_feed_data(request, feed_name):
         'buses': buses,
         'messages': get_message()
     })
-

@@ -13,6 +13,7 @@ class User(models.Model):
 
     class Meta:
         db_table = 'User'
+        managed =True
 
     @property
     def is_authenticated(self):
@@ -109,6 +110,7 @@ class Slide(models.Model):
 
     class Meta:
         db_table = 'Slide'
+        managed =True
 
     def __str__(self):
         return self.title
@@ -120,6 +122,7 @@ class Alert(models.Model):
 
     class Meta:
         db_table = 'Alert'
+        managed =True
 
     def __str__(self):
         return f"Alert: {self.alert_text}"
@@ -134,6 +137,7 @@ class Message(models.Model):
 
     class Meta:
         db_table = 'Message'
+        managed =True
 
     def __str__(self):
         return self.text
@@ -147,6 +151,7 @@ class Settings(models.Model):
 
     class Meta:
         db_table = 'Settings'
+        managed =True
 
     def __str__(self):
         return f"Settings {self.id}"
@@ -160,6 +165,7 @@ class Room(models.Model):
 
     class Meta:
         db_table = 'Room'
+        managed =True
 
     def __str__(self):
         return self.title
@@ -173,6 +179,7 @@ class FeedStatus(models.Model):
 
     class Meta:
         db_table = 'FeedStatus'
+        managed =True
 
     def __str__(self):
         return self.feed_name
@@ -190,6 +197,7 @@ class BusSchedule(models.Model):
 
     class Meta:
         db_table = 'BusSchedule'
+        managed =True
         ordering = ['id']
 
     def __str__(self):

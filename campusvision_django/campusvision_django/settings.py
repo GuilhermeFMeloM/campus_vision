@@ -4,6 +4,10 @@ Django settings for campusvision_django project.
 
 from pathlib import Path
 import os
+import dj_database_url  # <-- ADICIONE ESTA LINHA AQUI
+import pymysql
+pymysql.install_as_MySQLdb()
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,7 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-9sn0pp=#st+3b6x==%d#k)32cb@e2fm5qq$ft_4^dmztn&v-_1')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
+# DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
+DEBUG = True
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
@@ -83,20 +88,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'campusvision_django.wsgi.application'
 
 # Database: Suporta Cloud SQL (Postgres / MySQL) via DATABASE_URL ou SQLite local/volume
+
+ 	
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    try:
-        import dj_database_url
-        DATABASES = {
-            'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
-        }
-    except ImportError:
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
+    DATABASES = {
+        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
+    }
+    # Se for MySQL/TiDB, ativa o SSL compatível com PyMySQL
+    if 'mysql' in DATABASES['default'].get('ENGINE', ''):
+        DATABASES['default'].setdefault('OPTIONS', {})['ssl'] = {'check_hostname': False}
 else:
     DATABASES = {
         'default': {
@@ -139,4 +140,4 @@ POSTS_PER_PAGE = 10
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'mp4', 'webp'}
 WEATHER_KEY = os.environ.get('WEATHER_KEY', '99ec4e7d956393e48a8cda51317329c5')
 WEATHER_CITY = os.environ.get('WEATHER_CITY', 'São Paulo,BR')
-DEFAULT_DURATION = 10000
+DEFAULT_DURATION = 10000
