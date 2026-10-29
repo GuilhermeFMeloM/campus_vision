@@ -2,6 +2,10 @@ import json
 import logging
 import os
 import ast
+import unicodedata
+import re
+import time
+import shutil
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -83,7 +87,6 @@ def index(request):
     except Exception:
         feeds_list = ['Default']
 
-    # Calcula status e quantidade de slides para cada TV / Ponto de exibição
     feed_details = []
     status_map = {fs.feed_name: fs for fs in FeedStatus.objects.all()}
     
@@ -91,8 +94,6 @@ def index(request):
         fs = status_map.get(feed_name)
         is_online = bool(fs and fs.is_recently_updated == 1)
         last_seen = fs.last_access if fs else None
-        
-        # Conta slides aprovados para esta TV
         slides_count = len(get_slides(feed_name))
         
         feed_details.append({
@@ -114,7 +115,6 @@ def index(request):
         'clients': request.session.get('active_clients', []),
         'name': get_current_user_name(request)
     })
-
 
 def manager(request):
     """Gerenciador de slides enviados."""
@@ -239,16 +239,43 @@ def upload_file(request):
             return redirect('upload')
 
         if allowed_file(file.name):
-            upload_dir = settings.MEDIA_ROOT
-            os.makedirs(upload_dir, exist_ok=True)
-            upload_path = os.path.join(upload_dir, file.name)
-            with open(upload_path, 'wb+') as destination:
-                for chunk in file.chunks():
-                    destination.write(chunk)
+            raw_title = title or file.name
+
+            # Sanitiza o nome do arquivo para compatibilidade universal em Linux/Nginx/Web
+            base_name, ext = os.path.splitext(file.name)
+            clean_base = unicodedata.normalize('NFKD', base_name).encode('ASCII', 'ignore').decode('ASCII')
+            clean_base = re.sub(r'[^\w\s-]', '', clean_base).strip().replace(' ', '_')
+            clean_base = re.sub(r'[-_]+', '_', clean_base)
+            if not clean_base:
+                clean_base = f"media_{int(time.time())}"
+            final_filename = f"{clean_base}_{int(time.time())}{ext.lower()}"
+
+            # Grava o arquivo simultaneamente em app/static/uploads, staticfiles/uploads e media
+            target_dirs = [
+                os.path.join(settings.BASE_DIR, 'app', 'static', 'uploads'),
+                os.path.join(settings.BASE_DIR, 'staticfiles', 'uploads'),
+                os.path.join(settings.BASE_DIR, 'media'),
+            ]
+
+            saved_path = None
+            for target_dir in target_dirs:
+                try:
+                    os.makedirs(target_dir, exist_ok=True)
+                    dest_file = os.path.join(target_dir, final_filename)
+                    if saved_path and os.path.exists(saved_path):
+                        if not os.path.exists(dest_file) or not os.path.samefile(saved_path, dest_file):
+                            shutil.copy2(saved_path, dest_file)
+                    else:
+                        with open(dest_file, 'wb+') as destination:
+                            for chunk in file.chunks():
+                                destination.write(chunk)
+                        saved_path = dest_file
+                except Exception as e:
+                    logger.warning(f"Erro ao salvar arquivo em {target_dir}: {e}")
 
             if not title:
-                title = file.name
-            slide_path = file.name
+                title = raw_title
+            slide_path = final_filename
 
             add_slide(time_start, time_end, title, slide_path, feed_list, submitted_by=submitted_by, reading_time=reading_time)
             messages.success(request, f"Slide '{title}' enviado com sucesso para moderação!")
@@ -490,7 +517,6 @@ def bus_manager(request):
         'mod_count': mod_counter()
     })
 
-# API JSON Endpoints para a TV atualizar em tempo real sem recarregar a tela inteira
 def api_feed_data(request, feed_name):
     """Retorna todos os dados da TV em JSON para atualização em tempo real."""
     update_feed_access(feed_name)
