@@ -83,7 +83,7 @@
                                         <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
                                     </div>
                                 {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
-                                    <video class="d-block w-100 h-100" style="object-fit: contain;" autoplay muted playsinline preload="auto">
+                                    <video class="d-block w-100 h-100" style="object-fit: contain; background: #000;" muted playsinline preload="metadata">
                                         <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
                                         <source src="/media/{{ slide.slide_path }}" type="video/mp4">
                                     </video>
@@ -151,32 +151,57 @@
         setInterval(updateClockVertical, 1000);
         updateClockVertical();
 
-        const vCarousel = new bootstrap.Carousel(document.getElementById('verticalCarousel'), { interval: false, wrap: true });
+        const vCarouselElement = document.getElementById('verticalCarousel');
+        const vCarousel = new bootstrap.Carousel(vCarouselElement, { interval: false, wrap: true });
         let slideTimerV = null;
+        let isAdvancingV = false;
+
+        vCarouselElement.addEventListener('slide.bs.carousel', function() {
+            const allVideos = vCarouselElement.querySelectorAll('video');
+            allVideos.forEach(v => {
+                try {
+                    v.pause();
+                    v.currentTime = 0;
+                } catch(e) {}
+            });
+        });
 
         function runVerticalSequence() {
             clearTimeout(slideTimerV);
+            isAdvancingV = false;
+
             const active = document.querySelector('#verticalCarousel .carousel-item.active');
             if (!active) return;
+
             const readingTimeSeconds = parseInt(active.getAttribute('data-reading-time')) || 12;
             const video = active.querySelector('video:not(#keepAliveMediaV)');
+            const keepAlive = document.getElementById('keepAliveMediaV');
+
+            const advanceNext = () => {
+                if (!isAdvancingV) {
+                    isAdvancingV = true;
+                    clearTimeout(slideTimerV);
+                    try {
+                        if (video) video.pause();
+                    } catch(e) {}
+                    vCarousel.next();
+                }
+            };
 
             if (video) {
+                if (keepAlive) {
+                    try { keepAlive.pause(); } catch(e) {}
+                }
+
                 video.muted = true;
-                video.currentTime = 0;
+                video.playsInline = true;
+                try {
+                    video.currentTime = 0;
+                } catch(e) {}
 
-                let advanced = false;
-                const advanceNext = () => {
-                    if (!advanced) {
-                        advanced = true;
-                        clearTimeout(slideTimerV);
-                        vCarousel.next();
-                    }
-                };
-
-                video.onended = advanceNext;
-                video.onerror = () => {
-                    console.warn('Erro ao reproduzir vídeo vertical. Pulando...');
+                video.onended = () => { advanceNext(); };
+                video.onerror = (e) => {
+                    console.warn('Erro ao reproduzir vídeo vertical:', e);
                     setTimeout(advanceNext, 1000);
                 };
 
@@ -192,7 +217,7 @@
                     let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
                         ? (video.duration + 2)
                         : (readingTimeSeconds + 3);
-                    slideTimerV = setTimeout(advanceNext, duration * 1000);
+                    slideTimerV = setTimeout(advanceNext, Math.min(duration, 300) * 1000);
                 };
 
                 if (video.readyState >= 1) {
@@ -202,10 +227,13 @@
                     slideTimerV = setTimeout(advanceNext, (readingTimeSeconds + 5) * 1000);
                 }
             } else {
-                slideTimerV = setTimeout(() => { vCarousel.next(); }, readingTimeSeconds * 1000);
+                if (keepAlive) {
+                    try { keepAlive.play().catch(() => {}); } catch(e) {}
+                }
+                slideTimerV = setTimeout(() => { advanceNext(); }, readingTimeSeconds * 1000);
             }
         }
-        document.getElementById('verticalCarousel').addEventListener('slid.bs.carousel', runVerticalSequence);
+        vCarouselElement.addEventListener('slid.bs.carousel', runVerticalSequence);
         $(document).ready(runVerticalSequence);
 
         // Anti-sleep Screen WakeLock

@@ -51,7 +51,7 @@
                                         <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
                                     </div>
                                 {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
-                                    <video class="d-block w-100 tv-slide-video" autoplay muted playsinline preload="auto">
+                                    <video class="d-block w-100 tv-slide-video" muted playsinline preload="metadata" style="background: #000; width: 100%; height: 100%; object-fit: contain;">
                                         <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
                                         <source src="/media/{{ slide.slide_path }}" type="video/mp4">
                                         Seu navegador não suporta a tag de vídeo.
@@ -163,67 +163,99 @@
         const carouselElement = document.getElementById('tvCarousel');
         const carousel = new bootstrap.Carousel(carouselElement, { interval: false, wrap: true });
         let slideTimer = null;
+        let isAdvancing = false;
+
+        // Pausa e reseta todos os vídeos imediatamente durante a transição de slides
+        carouselElement.addEventListener('slide.bs.carousel', function() {
+            const allVideos = carouselElement.querySelectorAll('video');
+            allVideos.forEach(v => {
+                try {
+                    v.pause();
+                    v.currentTime = 0;
+                } catch(e) {}
+            });
+        });
 
         function playSlideSequence() {
             clearTimeout(slideTimer);
+            isAdvancing = false;
+
             const activeItem = document.querySelector('.carousel-item.active');
             if (!activeItem) return;
 
             const readingTimeSeconds = parseInt(activeItem.getAttribute('data-reading-time')) || 12;
             const video = activeItem.querySelector('video:not(#keepAliveMedia)');
+            const keepAlive = document.getElementById('keepAliveMedia');
+
+            const advanceNext = () => {
+                if (!isAdvancing) {
+                    isAdvancing = true;
+                    clearTimeout(slideTimer);
+                    try {
+                        if (video) {
+                            video.pause();
+                        }
+                    } catch(e) {}
+                    carousel.next();
+                }
+            };
 
             if (video) {
+                // Pausa o micro-keepalive para liberar 100% do decodificador de hardware da Smart TV
+                if (keepAlive) {
+                    try { keepAlive.pause(); } catch(e) {}
+                }
+
                 video.muted = true;
-                video.currentTime = 0;
-                
-                let advanced = false;
-                const advanceNext = () => {
-                    if (!advanced) {
-                        advanced = true;
-                        clearTimeout(slideTimer);
-                        carousel.next();
-                    }
-                };
+                video.playsInline = true;
+                try {
+                    video.currentTime = 0;
+                } catch(e) {}
 
                 // Manipulador de fim de vídeo
-                video.onended = advanceNext;
+                video.onended = () => {
+                    advanceNext();
+                };
 
-                // Manipulador de erro: se falhar o carregamento, avança para o próximo
-                video.onerror = () => {
-                    console.warn('Erro ao reproduzir vídeo. Pulando para o próximo slide...');
+                // Manipulador de erro: se falhar o carregamento ou codec, pula para o próximo
+                video.onerror = (e) => {
+                    console.warn('Erro ao carregar ou reproduzir vídeo. Pulando slide...', e);
                     setTimeout(advanceNext, 1000);
                 };
 
-                // Tenta dar play com mute garantido
+                // Inicia reprodução
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
-                    playPromise.catch(e => {
-                        console.warn('Autoplay com vídeo impedido pelo navegador:', e);
+                    playPromise.catch(err => {
+                        console.warn('Autoplay bloqueado ou erro no vídeo:', err);
                         // Fallback: se o play falhar, espera o tempo de leitura e avança
                         slideTimer = setTimeout(advanceNext, readingTimeSeconds * 1000);
                     });
                 }
 
-                // TIMER DE SEGURANÇA: Se o vídeo travar, demorar no buffer ou não disparar onended, avança após duração + folga
-                const checkDurationAndSetTimer = () => {
-                    let duration = (video.duration && !isNaN(video.duration) && video.duration > 0) 
-                        ? (video.duration + 2) 
+                // TIMER DE SEGURANÇA (Watchdog): Impede que a tela fique congelada
+                const setupSafetyWatchdog = () => {
+                    let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
+                        ? (video.duration + 2)
                         : (readingTimeSeconds + 3);
-                    slideTimer = setTimeout(advanceNext, duration * 1000);
+                    // Limite máximo de segurança para um slide de vídeo: duração ou no máx 5 min
+                    slideTimer = setTimeout(advanceNext, Math.min(duration, 300) * 1000);
                 };
 
                 if (video.readyState >= 1) {
-                    checkDurationAndSetTimer();
+                    setupSafetyWatchdog();
                 } else {
-                    video.onloadedmetadata = checkDurationAndSetTimer;
-                    // Fallback imediato caso metadata nunca chegue
+                    video.onloadedmetadata = setupSafetyWatchdog;
                     slideTimer = setTimeout(advanceNext, (readingTimeSeconds + 5) * 1000);
                 }
 
             } else {
-                slideTimer = setTimeout(function() {
-                    carousel.next();
-                }, readingTimeSeconds * 1000);
+                // Para slides sem vídeo (imagens, notícias), reativa o keepAlive para a TV não hibernar
+                if (keepAlive) {
+                    try { keepAlive.play().catch(() => {}); } catch(e) {}
+                }
+
+                slideTimer = setTimeout(advanceNext, readingTimeSeconds * 1000);
             }
         }
 
