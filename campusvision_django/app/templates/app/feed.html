@@ -23,53 +23,52 @@
 
         <!-- Carrossel Principal de Slides / Vídeos -->
         <div class="tv-main-carousel">
-            <div id="tvCarousel" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="false">
-                <div class="carousel-inner" id="carouselInner">
-                    {% if slides %}
-                        {% for slide in slides %}
-                            <div class="carousel-item {% if forloop.first %}active{% endif %}" data-reading-time="{{ slide.reading_time|default:12 }}">
-                                {% if slide.type == 'news' %}
-                                    <!-- Slide Dinâmico de Notícia (Broadcast News Page) -->
-                                    <div class="tv-news-card-slide">
-                                        <div class="news-slide-glow-bg"></div>
-                                        <div class="news-slide-content">
-                                            <div class="news-slide-header">
-                                                <span class="badge-source"><i class="fa fa-newspaper-o"></i> {{ slide.source|default:"G1 / BBC" }}</span>
-                                                <span class="badge-category">{{ slide.category|default:"Destaque" }}</span>
-                                                <span class="news-live-tag"><span class="live-dot"></span> AO VIVO</span>
-                                            </div>
-                                            <h1 class="news-slide-title">{{ slide.title }}</h1>
-                                            {% if slide.summary %}
-                                                <p class="news-slide-summary">{{ slide.summary }}</p>
-                                            {% endif %}
-                                            <div class="news-slide-footer">
-                                            </div>
+            <div id="tvCarousel" class="carousel-inner" style="height: 100%; width: 100%;">
+                {% if slides %}
+                    {% for slide in slides %}
+                        <div class="carousel-item {% if forloop.first %}active{% endif %}" data-reading-time="{{ slide.reading_time|default:12 }}">
+                            {% if slide.type == 'news' %}
+                                <!-- Slide Dinâmico de Notícia (Broadcast News Page) -->
+                                <div class="tv-news-card-slide">
+                                    <div class="news-slide-content">
+                                        <div class="news-slide-header">
+                                            <span class="badge-source"><i class="fa fa-newspaper-o"></i> {{ slide.source|default:"G1 / BBC" }}</span>
+                                            <span class="badge-category">{{ slide.category|default:"Destaque" }}</span>
+                                            <span class="news-live-tag"><span class="live-dot"></span> AO VIVO</span>
+                                        </div>
+                                        <h1 class="news-slide-title">{{ slide.title }}</h1>
+                                        {% if slide.summary %}
+                                            <p class="news-slide-summary">{{ slide.summary }}</p>
+                                        {% endif %}
+                                        <div class="news-slide-footer">
+                                            <span>Atualizado em tempo real</span>
+                                            <span class="news-tv-watermark">CampusVision Live</span>
                                         </div>
                                     </div>
-                                {% elif slide.type == 'embed' or slide.slide_path|startswith:"http" %}
-                                    <div class="w-100 h-100" style="background: #0f172a; overflow: hidden; position: relative;">
-                                        <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
-                                    </div>
-                                {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
-                                    <video class="d-block w-100 tv-slide-video" muted playsinline preload="metadata" style="background: #000; width: 100%; height: 100%; object-fit: contain;">
-                                        <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
-                                        <source src="/media/{{ slide.slide_path }}" type="video/mp4">
-                                        Seu navegador não suporta a tag de vídeo.
-                                    </video>
-                                {% else %}
-                                    <img src="{% static 'uploads/' %}{{ slide.slide_path }}" class="d-block w-100 tv-slide-img" alt="{{ slide.title }}">
-                                {% endif %}
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="carousel-item active" data-reading-time="10">
-                            <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4">
-                                <h1 class="display-3 font-weight-bold text-primary mb-3">CampusVision TV</h1>
-                                <p class="lead text-light">Feed: <strong>{{ title }}</strong> - Transmissão Ativa</p>
-                            </div>
+                                </div>
+                            {% elif slide.type == 'embed' or slide.slide_path|startswith:"http" %}
+                                <div class="w-100 h-100" style="background: #0f172a; overflow: hidden; position: relative;">
+                                    <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+                                </div>
+                            {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
+                                <video class="d-block w-100 tv-slide-video" muted playsinline preload="metadata" style="background: #000; width: 100%; height: 100%; object-fit: contain;">
+                                    <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
+                                    <source src="/media/{{ slide.slide_path }}" type="video/mp4">
+                                    Seu navegador não suporta a tag de vídeo.
+                                </video>
+                            {% else %}
+                                <img src="{% static 'uploads/' %}{{ slide.slide_path }}" class="d-block w-100 tv-slide-img" alt="{{ slide.title }}">
+                            {% endif %}
                         </div>
-                    {% endif %}
-                </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="carousel-item active" data-reading-time="10">
+                        <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center p-4">
+                            <h1 class="display-3 font-weight-bold text-primary mb-3">CampusVision TV</h1>
+                            <p class="lead text-light">Feed: <strong>{{ title }}</strong> - Transmissão Ativa</p>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -143,7 +142,6 @@
 
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Relógio e Data em tempo real
@@ -159,49 +157,60 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Controle do Carrossel baseado no reading_time de cada slide e duração do vídeo
-        const carouselElement = document.getElementById('tvCarousel');
-        const carousel = new bootstrap.Carousel(carouselElement, { interval: false, wrap: true });
+        // MOTOR DE TRANSIÇÃO DIRETO E ULTRA-LEVE (OTIMIZADO PARA SMART TVS)
         let slideTimer = null;
-        let isAdvancing = false;
+        let isTransitioning = false;
 
-        // Pausa e reseta todos os vídeos imediatamente durante a transição de slides
-        carouselElement.addEventListener('slide.bs.carousel', function() {
-            const allVideos = carouselElement.querySelectorAll('video');
-            allVideos.forEach(v => {
-                try {
-                    v.pause();
-                    v.currentTime = 0;
-                } catch(e) {}
-            });
-        });
-
-        function playSlideSequence() {
+        function goToNextSlide() {
             clearTimeout(slideTimer);
-            isAdvancing = false;
+            const items = document.querySelectorAll('#tvCarousel .carousel-item');
+            if (!items || items.length === 0) return;
 
-            const activeItem = document.querySelector('.carousel-item.active');
+            if (items.length === 1) {
+                // Apenas 1 slide: roda novamente
+                playCurrentSlide();
+                return;
+            }
+
+            let currentIndex = -1;
+            items.forEach((item, idx) => {
+                if (item.classList.contains('active')) {
+                    currentIndex = idx;
+                }
+            });
+
+            const nextIndex = (currentIndex + 1) % items.length;
+
+            // Pausa e reseta todos os vídeos imediatamente
+            items.forEach(item => {
+                const v = item.querySelector('video');
+                if (v) {
+                    try {
+                        v.pause();
+                        v.currentTime = 0;
+                    } catch(e) {}
+                }
+                item.classList.remove('active');
+            });
+
+            // Ativa o próximo slide
+            items[nextIndex].classList.add('active');
+
+            // Inicia reprodução do novo slide ativo
+            playCurrentSlide();
+        }
+
+        function playCurrentSlide() {
+            clearTimeout(slideTimer);
+            const activeItem = document.querySelector('#tvCarousel .carousel-item.active');
             if (!activeItem) return;
 
             const readingTimeSeconds = parseInt(activeItem.getAttribute('data-reading-time')) || 12;
             const video = activeItem.querySelector('video:not(#keepAliveMedia)');
             const keepAlive = document.getElementById('keepAliveMedia');
 
-            const advanceNext = () => {
-                if (!isAdvancing) {
-                    isAdvancing = true;
-                    clearTimeout(slideTimer);
-                    try {
-                        if (video) {
-                            video.pause();
-                        }
-                    } catch(e) {}
-                    carousel.next();
-                }
-            };
-
             if (video) {
-                // Pausa o micro-keepalive para liberar 100% do decodificador de hardware da Smart TV
+                // Pausa o keepAlive para liberar a GPU da Smart TV para o vídeo do slide
                 if (keepAlive) {
                     try { keepAlive.pause(); } catch(e) {}
                 }
@@ -212,69 +221,59 @@
                     video.currentTime = 0;
                 } catch(e) {}
 
-                // Manipulador de fim de vídeo
                 video.onended = () => {
-                    advanceNext();
+                    goToNextSlide();
                 };
 
-                // Manipulador de erro: se falhar o carregamento ou codec, pula para o próximo
                 video.onerror = (e) => {
-                    console.warn('Erro ao carregar ou reproduzir vídeo. Pulando slide...', e);
-                    setTimeout(advanceNext, 1000);
+                    console.warn('Erro ao decodificar vídeo. Pulando para o próximo slide...', e);
+                    setTimeout(goToNextSlide, 1000);
                 };
 
-                // Inicia reprodução
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(err => {
-                        console.warn('Autoplay bloqueado ou erro no vídeo:', err);
-                        // Fallback: se o play falhar, espera o tempo de leitura e avança
-                        slideTimer = setTimeout(advanceNext, readingTimeSeconds * 1000);
+                        console.warn('Autoplay bloqueado pelo navegador da TV:', err);
+                        slideTimer = setTimeout(goToNextSlide, readingTimeSeconds * 1000);
                     });
                 }
 
-                // TIMER DE SEGURANÇA (Watchdog): Impede que a tela fique congelada
-                const setupSafetyWatchdog = () => {
+                // Watchdog de segurança para Smart TVs: avança se o vídeo travar
+                const setWatchdog = () => {
                     let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
                         ? (video.duration + 2)
                         : (readingTimeSeconds + 3);
-                    // Limite máximo de segurança para um slide de vídeo: duração ou no máx 5 min
-                    slideTimer = setTimeout(advanceNext, Math.min(duration, 300) * 1000);
+                    slideTimer = setTimeout(goToNextSlide, Math.min(duration, 300) * 1000);
                 };
 
                 if (video.readyState >= 1) {
-                    setupSafetyWatchdog();
+                    setWatchdog();
                 } else {
-                    video.onloadedmetadata = setupSafetyWatchdog;
-                    slideTimer = setTimeout(advanceNext, (readingTimeSeconds + 5) * 1000);
+                    video.onloadedmetadata = setWatchdog;
+                    slideTimer = setTimeout(goToNextSlide, (readingTimeSeconds + 4) * 1000);
                 }
 
             } else {
-                // Para slides sem vídeo (imagens, notícias), reativa o keepAlive para a TV não hibernar
+                // Para slides normais (imagens, notícias), reativa keepAlive
                 if (keepAlive) {
                     try { keepAlive.play().catch(() => {}); } catch(e) {}
                 }
 
-                slideTimer = setTimeout(advanceNext, readingTimeSeconds * 1000);
+                slideTimer = setTimeout(goToNextSlide, readingTimeSeconds * 1000);
             }
         }
 
-        carouselElement.addEventListener('slid.bs.carousel', function() {
-            playSlideSequence();
-        });
-
-        // Inicia a sequência de slides
+        // Inicia o carrossel no carregamento
         $(document).ready(function() {
-            playSlideSequence();
+            playCurrentSlide();
         });
 
-        // Atualização dos dados em tempo real a cada 30 segundos
+        // Sincronização em tempo real a cada 30s
         const FEED_NAME = "{{ title }}";
         function refreshFeedData() {
             $.getJSON(`/api/feed/${FEED_NAME}/`, function(data) {
                 if (!data) return;
 
-                // Atualiza Alerta se existir
                 if (data.alert) {
                     if ($('#alertBar').length === 0) {
                         $('.tv-screen-container').prepend(`
@@ -290,7 +289,6 @@
                     $('#alertBar').remove();
                 }
 
-                // Atualiza Clima
                 if (data.weather) {
                     $('#currentTemp').text(`${data.weather.temp_celsius}°`);
                     $('#cityName').html(`<i class="fa fa-map-marker text-danger"></i> ${data.weather.city}`);
@@ -311,7 +309,6 @@
                     }
                 }
 
-                // Atualiza Ônibus
                 if (data.buses && data.buses.length > 0) {
                     let busHtml = '';
                     data.buses.slice(0, 3).forEach(b => {
@@ -326,7 +323,6 @@
                     $('#busList').html(busHtml);
                 }
 
-                // Atualiza Avisos e Comunicados no Ticker Inferior
                 if (data.messages && data.messages.length > 0) {
                     let tickerHtml = '';
                     data.messages.forEach(m => {
@@ -335,62 +331,42 @@
                     $('#newsTickerTrack').html(tickerHtml);
                 }
             }).fail(function(err) {
-                console.log("Erro na sincronização do feed:", err);
+                console.log("Erro na sincronização:", err);
             });
         }
 
-        // Sincroniza a cada 30 segundos
         setInterval(refreshFeedData, 30000);
 
-        // =========================================================================
-        // PREVENÇÃO DE BLOQUEIO / SLEEP POR INATIVIDADE DA SMART TV (KEEP-ALIVE)
-        // =========================================================================
+        // Prevenção de Sleep
         let wakeLock = null;
-
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('✅ Screen WakeLock ativo: a TV não entrará em repouso.');
-                    wakeLock.addEventListener('release', () => {
-                        console.log('WakeLock liberado.');
-                    });
+                    console.log('✅ Screen WakeLock ativo');
                 }
             } catch (err) {
-                console.log('WakeLock erro ou não suportado:', err);
+                console.log('WakeLock:', err);
             }
         }
 
-        // Solicita o WakeLock ao carregar a página e ao clicar em qualquer lugar
-        $(document).ready(function() {
-            requestWakeLock();
-            $(document).on('click touchstart', function() {
-                requestWakeLock();
-            });
-        });
-
-        // Reativa o WakeLock se a aba voltar a ficar visível
-        document.addEventListener('visibilitychange', async () => {
+        $(document).ready(requestWakeLock);
+        $(document).on('click touchstart', requestWakeLock);
+        document.addEventListener('visibilitychange', () => {
             if (wakeLock !== null && document.visibilityState === 'visible') {
                 requestWakeLock();
             }
         });
 
-        // Ativação de Tela Cheia com duplo clique na TV
         $(document).on('dblclick', function() {
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log('Erro ao entrar em tela cheia:', err);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
             }
         });
     </script>
 
-    <!-- Micro elemento de mídia invisível para sinalizar atividade contínua ao sistema operacional da Smart TV -->
     <video id="keepAliveMedia" style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;" autoplay loop muted playsinline>
         <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAADpmcmVlAAAAG21kYXQAAAGzAAEAABg4AAAAABg8AAAACQAAAAB==" type="video/mp4">
     </video>
