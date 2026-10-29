@@ -77,13 +77,15 @@
                                         <div class="mt-auto text-muted small border-top pt-2">
                                             <i class="fa fa-bolt text-warning"></i> Notícia em Tempo Real
                                         </div>
+                                    </div>
                                 {% elif slide.type == 'embed' or slide.slide_path|startswith:"http" %}
                                     <div class="w-100 h-100" style="background: #0f172a; overflow: hidden; position: relative;">
                                         <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
                                     </div>
                                 {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
-                                    <video class="d-block w-100 h-100" style="object-fit: contain;" autoplay muted playsinline>
+                                    <video class="d-block w-100 h-100" style="object-fit: contain;" autoplay muted playsinline preload="auto">
                                         <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
+                                        <source src="/media/{{ slide.slide_path }}" type="video/mp4">
                                     </video>
                                 {% else %}
                                     <img src="{% static 'uploads/' %}{{ slide.slide_path }}" class="d-block w-100 h-100" style="object-fit: contain;" alt="{{ slide.title }}">
@@ -157,15 +159,48 @@
             const active = document.querySelector('#verticalCarousel .carousel-item.active');
             if (!active) return;
             const readingTimeSeconds = parseInt(active.getAttribute('data-reading-time')) || 12;
-            const video = active.querySelector('video');
+            const video = active.querySelector('video:not(#keepAliveMediaV)');
 
             if (video) {
+                video.muted = true;
                 video.currentTime = 0;
-                video.play().catch(e => console.log('Video autoplay prevented', e));
-                video.onended = function() {
-                    vCarousel.next();
+
+                let advanced = false;
+                const advanceNext = () => {
+                    if (!advanced) {
+                        advanced = true;
+                        clearTimeout(slideTimerV);
+                        vCarousel.next();
+                    }
                 };
-                slideTimerV = setTimeout(() => { vCarousel.next(); }, (readingTimeSeconds + 2) * 1000);
+
+                video.onended = advanceNext;
+                video.onerror = () => {
+                    console.warn('Erro ao reproduzir vídeo vertical. Pulando...');
+                    setTimeout(advanceNext, 1000);
+                };
+
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => {
+                        console.warn('Autoplay bloqueado:', e);
+                        slideTimerV = setTimeout(advanceNext, readingTimeSeconds * 1000);
+                    });
+                }
+
+                const checkDurationAndSetTimer = () => {
+                    let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
+                        ? (video.duration + 2)
+                        : (readingTimeSeconds + 3);
+                    slideTimerV = setTimeout(advanceNext, duration * 1000);
+                };
+
+                if (video.readyState >= 1) {
+                    checkDurationAndSetTimer();
+                } else {
+                    video.onloadedmetadata = checkDurationAndSetTimer;
+                    slideTimerV = setTimeout(advanceNext, (readingTimeSeconds + 5) * 1000);
+                }
             } else {
                 slideTimerV = setTimeout(() => { vCarousel.next(); }, readingTimeSeconds * 1000);
             }
@@ -188,7 +223,7 @@
         $(document).ready(requestWakeLockV);
         $(document).on('click touchstart', requestWakeLockV);
     </script>
-    <video style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;" autoplay loop muted playsinline>
+    <video id="keepAliveMediaV" style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;" autoplay loop muted playsinline>
         <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAADpmcmVlAAAAG21kYXQAAAGzAAEAABg4AAAAABg8AAAACQAAAAB==" type="video/mp4">
     </video>
 </body>

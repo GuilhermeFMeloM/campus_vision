@@ -2,9 +2,10 @@
 URL configuration for campusvision_django project.
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
 from app import views
 from app import api
 
@@ -45,6 +46,10 @@ urlpatterns = [
     path('api/feed/<feed_name>/', views.api_feed_data, name='api_feed_data'),
     path('api/slides/<feed>/', api.slides, name='api_slides'),
     path('api/messages/', api.messages, name='api_messages'),
+
+    # Servir arquivos de uploads (vídeos e imagens) em produção e desenvolvimento
+    re_path(r'^static/uploads/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
 if settings.DEBUG:

@@ -20,8 +20,29 @@ def mod_counter():
 def allowed_file(filename, allowed_ext=None):
     """Verifica se a extensão do arquivo está permitida."""
     if allowed_ext is None:
-        allowed_ext = getattr(settings, 'ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'mp4', 'webp'})
+        allowed_ext = getattr(settings, 'ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'mp4', 'webm'})
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_ext
+
+def feed_matches(target_feed, feeds_val):
+    """Verifica de forma case-insensitive e tolerante se o slide pertence ao feed especificado."""
+    if not target_feed or not feeds_val:
+        return False
+    target = str(target_feed).strip().lower()
+    feeds_str = str(feeds_val).strip().lower()
+
+    if target in feeds_str:
+        return True
+
+    # Parse caso esteja no formato lista string "['feed1', 'feed2']"
+    import ast
+    try:
+        parsed = ast.literal_eval(str(feeds_val))
+        if isinstance(parsed, (list, tuple, set)):
+            return any(str(item).strip().lower() == target for item in parsed)
+    except Exception:
+        pass
+
+    return False
 
 def add_slide(time_start, time_end, title, slide_path, feeds, submitted_by="Admin", reading_time=10):
     """Adiciona um slide no banco de dados com segurança."""
@@ -82,7 +103,7 @@ def get_slides(target_feed, interleave_news=True):
         if end_date and today_date > end_date:
             is_valid_date = False
 
-        if target_feed in slide.feeds and is_valid_date:
+        if feed_matches(target_feed, slide.feeds) and is_valid_date:
             path_lower = slide.slide_path.strip().lower()
             if path_lower.startswith(('http://', 'https://')):
                 s_type = 'embed'
@@ -165,7 +186,7 @@ def get_video(target_feed):
         if end_date and today_date > end_date:
             is_valid_date = False
 
-        if (target_feed in slide.feeds and is_valid_date and
+        if (feed_matches(target_feed, slide.feeds) and is_valid_date and
             slide.slide_path.lower().endswith(('.mp4', '.webm'))):
             return slide.slide_path
     return None

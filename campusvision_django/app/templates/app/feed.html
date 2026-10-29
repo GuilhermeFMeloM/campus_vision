@@ -45,13 +45,15 @@
                                             <div class="news-slide-footer">
                                             </div>
                                         </div>
+                                    </div>
                                 {% elif slide.type == 'embed' or slide.slide_path|startswith:"http" %}
                                     <div class="w-100 h-100" style="background: #0f172a; overflow: hidden; position: relative;">
                                         <iframe src="{{ slide.slide_path }}" class="w-100 h-100 border-0" allow="autoplay; fullscreen; encrypted-media" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" loading="eager" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
                                     </div>
                                 {% elif slide.type == 'video' or slide.slide_path|endswith:".mp4" or slide.slide_path|endswith:".webm" %}
-                                    <video class="d-block w-100 tv-slide-video" autoplay muted playsinline>
+                                    <video class="d-block w-100 tv-slide-video" autoplay muted playsinline preload="auto">
                                         <source src="{% static 'uploads/' %}{{ slide.slide_path }}" type="video/mp4">
+                                        <source src="/media/{{ slide.slide_path }}" type="video/mp4">
                                         Seu navegador não suporta a tag de vídeo.
                                     </video>
                                 {% else %}
@@ -157,7 +159,7 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // Controle do Carrossel baseado no reading_time de cada slide
+        // Controle do Carrossel baseado no reading_time de cada slide e duração do vídeo
         const carouselElement = document.getElementById('tvCarousel');
         const carousel = new bootstrap.Carousel(carouselElement, { interval: false, wrap: true });
         let slideTimer = null;
@@ -168,14 +170,56 @@
             if (!activeItem) return;
 
             const readingTimeSeconds = parseInt(activeItem.getAttribute('data-reading-time')) || 12;
-            const video = activeItem.querySelector('video');
+            const video = activeItem.querySelector('video:not(#keepAliveMedia)');
 
             if (video) {
+                video.muted = true;
                 video.currentTime = 0;
-                video.play().catch(e => console.log('Video autoplay prevented', e));
-                video.onended = function() {
-                    carousel.next();
+                
+                let advanced = false;
+                const advanceNext = () => {
+                    if (!advanced) {
+                        advanced = true;
+                        clearTimeout(slideTimer);
+                        carousel.next();
+                    }
                 };
+
+                // Manipulador de fim de vídeo
+                video.onended = advanceNext;
+
+                // Manipulador de erro: se falhar o carregamento, avança para o próximo
+                video.onerror = () => {
+                    console.warn('Erro ao reproduzir vídeo. Pulando para o próximo slide...');
+                    setTimeout(advanceNext, 1000);
+                };
+
+                // Tenta dar play com mute garantido
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => {
+                        console.warn('Autoplay com vídeo impedido pelo navegador:', e);
+                        // Fallback: se o play falhar, espera o tempo de leitura e avança
+                        slideTimer = setTimeout(advanceNext, readingTimeSeconds * 1000);
+                    });
+                }
+
+                // TIMER DE SEGURANÇA: Se o vídeo travar, demorar no buffer ou não disparar onended, avança após duração + folga
+                const checkDurationAndSetTimer = () => {
+                    let duration = (video.duration && !isNaN(video.duration) && video.duration > 0) 
+                        ? (video.duration + 2) 
+                        : (readingTimeSeconds + 3);
+                    slideTimer = setTimeout(advanceNext, duration * 1000);
+                };
+
+                if (video.readyState >= 1) {
+                    checkDurationAndSetTimer();
+                } else {
+                    video.onloadedmetadata = checkDurationAndSetTimer;
+                    // Fallback imediato caso metadata nunca chegue
+                    slideTimer = setTimeout(advanceNext, (readingTimeSeconds + 5) * 1000);
+                }
+
             } else {
                 slideTimer = setTimeout(function() {
                     carousel.next();
