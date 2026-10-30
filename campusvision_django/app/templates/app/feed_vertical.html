@@ -322,29 +322,36 @@
         let lastSlidesSignatureV = "";
 
         function checkRemoteUpdatesV() {
-            $.getJSON(`/api/feed/${FEED_NAME_V}/`, function(data) {
-                if (!data) return;
+            $.ajax({
+                url: `/api/feed/${encodeURIComponent(FEED_NAME_V)}/?_t=${Date.now()}`,
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function(data) {
+                    if (!data) return;
 
-                if (data.reload_id !== undefined && data.reload_id !== null) {
-                    const serverReloadId = parseInt(data.reload_id);
-                    if (serverReloadId > lastReloadIdV) {
-                        console.log(`[SmartTV Vertical] Recarregamento remoto (${serverReloadId} > ${lastReloadIdV}). Recarregando...`);
-                        window.location.reload(true);
-                        return;
+                    if (data.reload_id !== undefined && data.reload_id !== null) {
+                        const serverReloadId = parseInt(data.reload_id);
+                        if (serverReloadId > lastReloadIdV) {
+                            console.log(`[SmartTV Vertical] Recarregamento remoto (${serverReloadId} > ${lastReloadIdV}). Recarregando...`);
+                            window.location.reload(true);
+                            return;
+                        }
                     }
-                }
 
-                if (data.slides && Array.isArray(data.slides)) {
-                    const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
-                    if (lastSlidesSignatureV !== "" && currentSig !== lastSlidesSignatureV) {
-                        console.log("[SmartTV Vertical] Alteração na grade de slides. Recarregando...");
-                        window.location.reload(true);
-                        return;
+                    if (data.slides && Array.isArray(data.slides)) {
+                        const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
+                        if (lastSlidesSignatureV !== "" && currentSig !== lastSlidesSignatureV) {
+                            console.log("[SmartTV Vertical] Alteração na grade de slides. Recarregando...");
+                            window.location.reload(true);
+                            return;
+                        }
+                        lastSlidesSignatureV = currentSig;
                     }
-                    lastSlidesSignatureV = currentSig;
+                },
+                error: function(err) {
+                    console.log("Erro na verificação:", err);
                 }
-            }).fail(function(err) {
-                console.log("Erro na verificação:", err);
             });
         }
 

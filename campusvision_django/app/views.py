@@ -22,7 +22,7 @@ from .utils import (
     mod_counter, alert_status, add_message, add_slide, allowed_file, appr_slide,
     remove_slide, update_alert, get_slides, get_message, update_settings, get_settings,
     update_slide, get_video, update_feed_access, get_news_feed, get_weather_data,
-    get_bus_schedules, signups_allowed, is_news_enabled_for_feed
+    get_bus_schedules, signups_allowed, is_news_enabled_for_feed, trigger_feed_reload
 )
 from .models import Message, Slide, Room, FeedStatus, User, BusSchedule
 from .forms import CustomUserCreationForm
@@ -245,6 +245,10 @@ def upload_file(request):
         submitted_by = get_current_user_name(request)
 
         # Se for um painel / link embed
+        is_admin_user = request.user.is_authenticated and (getattr(request.user, 'is_admin', False) or getattr(request.user, 'is_staff', False))
+        auto_approve = request.POST.get('auto_approve') == '1' or is_admin_user
+        initial_approval = "Approved" if auto_approve else "Waiting Review"
+
         if media_type == 'embed' or (embed_url and embed_url.startswith(('http://', 'https://'))):
             if not embed_url.startswith(('http://', 'https://')):
                 messages.error(request, 'URL do painel inválida. Insira uma URL completa iniciando com http:// ou https://')
@@ -254,8 +258,11 @@ def upload_file(request):
             if not title:
                 title = "Painel Web"
 
-            add_slide(time_start, time_end, title, slide_path, feed_list, submitted_by=submitted_by, reading_time=reading_time)
-            messages.success(request, f"Painel '{title}' adicionado com sucesso para moderação!")
+            add_slide(time_start, time_end, title, slide_path, feed_list, submitted_by=submitted_by, reading_time=reading_time, approval=initial_approval)
+            if initial_approval == "Approved":
+                messages.success(request, f"Painel '{title}' publicado e ativado imediatamente nas TVs!")
+            else:
+                messages.success(request, f"Painel '{title}' adicionado com sucesso para moderação!")
             return redirect('manager')
 
         # Se for upload de arquivo físico (Imagem ou Vídeo)
@@ -303,8 +310,11 @@ def upload_file(request):
                 title = raw_title
             slide_path = final_filename
 
-            add_slide(time_start, time_end, title, slide_path, feed_list, submitted_by=submitted_by, reading_time=reading_time)
-            messages.success(request, f"Slide '{title}' enviado com sucesso para moderação!")
+            add_slide(time_start, time_end, title, slide_path, feed_list, submitted_by=submitted_by, reading_time=reading_time, approval=initial_approval)
+            if initial_approval == "Approved":
+                messages.success(request, f"Slide '{title}' publicado e ativado imediatamente nas TVs!")
+            else:
+                messages.success(request, f"Slide '{title}' enviado com sucesso para moderação!")
             return redirect('manager')
         else:
             messages.error(request, 'Tipo de arquivo não permitido. Envie apenas imagens (.jpg, .png, .webp) ou vídeos (.mp4, .webm).')
@@ -339,14 +349,19 @@ def moderate(request):
 def moderate_post(request):
     if request.method == 'POST':
         slide_id = request.POST.get('slide_id')
+        slide = Slide.objects.filter(id=slide_id).first()
+        slide_feeds = slide.feeds if slide else None
         if 'Approve' in request.POST:
             appr_slide('Approved', slide_id)
-            messages.success(request, "Slide aprovado com sucesso.")
+            trigger_feed_reload(slide_feeds)
+            messages.success(request, "Slide aprovado com sucesso e publicado nas TVs!")
         elif 'Deny' in request.POST:
             appr_slide('Denied', slide_id)
+            trigger_feed_reload(slide_feeds)
             messages.warning(request, "Slide reprovado.")
         elif 'Delete' in request.POST:
             remove_slide(slide_id)
+            trigger_feed_reload(slide_feeds)
             messages.info(request, "Slide excluído.")
     return redirect('mod')
 
@@ -375,7 +390,8 @@ def edit(request, id):
         reading_time = request.POST.get('reading_time', slide.reading_time or 10)
 
         update_slide(id, title, time_start, time_end, selected_feeds, reading_time=reading_time)
-        messages.success(request, "Slide atualizado com sucesso!")
+        trigger_feed_reload(selected_feeds)
+        messages.success(request, "Slide atualizado com sucesso e transmitido para as TVs!")
         return redirect('manager')
 
 def messages_view(request):
@@ -547,21 +563,15 @@ def configuration_equipment(request):
                     show_news=False
                 )
                 messages.success(request, f"Notícias desativadas para o equipamento {feed_name}.")
+            trigger_feed_reload(feed_name)
         elif action == 'reload':
             feed_name = request.POST.get('feed_name')
             if feed_name == '__ALL__':
-                for item in FeedStatus.objects.all():
-                    item.reload_id = (getattr(item, 'reload_id', 0) or 0) + 1
-                    item.save()
+                trigger_feed_reload('__ALL__')
                 messages.success(request, "🔄 Comando de recarregamento remoto enviado para TODAS as TVs! Elas atualizarão em instantes.")
             else:
-                fs = FeedStatus.objects.filter(feed_name=feed_name).first()
-                if fs:
-                    fs.reload_id = (getattr(fs, 'reload_id', 0) or 0) + 1
-                    fs.save()
-                    messages.success(request, f"🔄 Comando de recarregamento remoto enviado para a TV '{feed_name}'. Ela atualizará em instantes!")
-                else:
-                    messages.warning(request, f"Equipamento '{feed_name}' não encontrado.")
+                trigger_feed_reload(feed_name)
+                messages.success(request, f"🔄 Comando de recarregamento remoto enviado para a TV '{feed_name}'. Ela atualizará em instantes!")
         elif action == 'delete':
             feed_name = request.POST.get('feed_name')
             if feed_name in feeds_list:
@@ -666,7 +676,7 @@ def api_feed_data(request, feed_name):
     fs = FeedStatus.objects.filter(feed_name=feed_name).first()
     reload_id = getattr(fs, 'reload_id', 0) if fs else 0
 
-    return JsonResponse({
+    response = JsonResponse({
         'slides': slides,
         'alert': alert_status(),
         'weather': weather,
@@ -676,3 +686,7 @@ def api_feed_data(request, feed_name):
         'reload_id': reload_id,
         'show_news': getattr(fs, 'show_news', True) if fs else True,
     })
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response

@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.conf import settings
+from django.db import connection
 from .models import Slide, Alert, Message, Settings, FeedStatus, BusSchedule
 
 logger = logging.getLogger(__name__)
@@ -44,19 +45,54 @@ def feed_matches(target_feed, feeds_val):
 
     return False
 
-def add_slide(time_start, time_end, title, slide_path, feeds, submitted_by="Admin", reading_time=10):
-    """Adiciona um slide no banco de dados com segurança."""
+def trigger_feed_reload(feeds=None):
+    """Incrementa reload_id para forçar as Smart TVs a atualizarem imediatamente."""
+    try:
+        with connection.cursor() as cursor:
+            if feeds is None or feeds == '__ALL__':
+                cursor.execute("UPDATE `FeedStatus` SET `reload_id` = COALESCE(`reload_id`, 0) + 1;")
+            else:
+                if isinstance(feeds, str):
+                    try:
+                        import ast
+                        parsed = ast.literal_eval(feeds)
+                        if isinstance(parsed, (list, tuple, set)):
+                            target_list = [str(f).strip() for f in parsed if f]
+                        else:
+                            target_list = [feeds.strip()]
+                    except Exception:
+                        target_list = [feeds.strip()]
+                elif isinstance(feeds, (list, tuple, set)):
+                    target_list = [str(f).strip() for f in feeds if f]
+                else:
+                    target_list = []
+
+                for feed_name in target_list:
+                    if feed_name:
+                        cursor.execute(
+                            "INSERT INTO `FeedStatus` (`feed_name`, `last_access`, `is_recently_updated`, `show_news`, `reload_id`) "
+                            "VALUES (%s, NOW(), 1, 1, 1) "
+                            "ON DUPLICATE KEY UPDATE `reload_id` = COALESCE(`reload_id`, 0) + 1;",
+                            [feed_name]
+                        )
+    except Exception as e:
+        logger.warning(f"Erro ao disparar trigger_feed_reload: {e}")
+
+def add_slide(time_start, time_end, title, slide_path, feeds, submitted_by="Admin", reading_time=10, approval="Approved"):
+    """Adiciona um slide no banco de dados com segurança e atualiza as TVs."""
     slide_data = Slide(
         time_start=str(time_start),
         time_end=str(time_end),
         title=title,
         slide_path=slide_path,
-        approval="Waiting Review",
+        approval=approval,
         submitted_by=submitted_by,
         feeds=str(feeds),
         reading_time=int(reading_time) if str(reading_time).isdigit() else 10
     )
     slide_data.save()
+    if approval == "Approved":
+        trigger_feed_reload(feeds)
     return slide_data
 
 def appr_slide(approval, slide_id):
@@ -65,6 +101,7 @@ def appr_slide(approval, slide_id):
         selected_slide = Slide.objects.get(id=slide_id)
         selected_slide.approval = approval
         selected_slide.save()
+        trigger_feed_reload(selected_slide.feeds)
         return 1
     except Slide.DoesNotExist:
         return 0
@@ -73,7 +110,9 @@ def remove_slide(slide_id):
     """Remove slide do banco."""
     try:
         selected_slide = Slide.objects.get(id=slide_id)
+        feeds = selected_slide.feeds
         selected_slide.delete()
+        trigger_feed_reload(feeds)
         return 1
     except Slide.DoesNotExist:
         return 0
