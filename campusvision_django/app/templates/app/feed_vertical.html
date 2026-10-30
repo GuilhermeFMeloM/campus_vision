@@ -205,17 +205,32 @@
                     video.currentTime = 0;
                 } catch(e) {}
 
-                video.onended = () => { goToNextSlideVertical(); };
+                let hasAdvanced = false;
+                const advanceOnceV = () => {
+                    if (hasAdvanced) return;
+                    hasAdvanced = true;
+                    goToNextSlideVertical();
+                };
+
+                video.onended = advanceOnceV;
+                video.ontimeupdate = () => {
+                    if (video.duration && !isNaN(video.duration) && video.duration > 0) {
+                        if (video.currentTime >= video.duration - 0.4) {
+                            advanceOnceV();
+                        }
+                    }
+                };
+
                 video.onerror = (e) => {
                     console.warn('Erro ao reproduzir vídeo vertical:', e);
-                    setTimeout(goToNextSlideVertical, 1000);
+                    setTimeout(advanceOnceV, 1500);
                 };
 
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(e => {
                         console.warn('Autoplay bloqueado:', e);
-                        slideTimerV = setTimeout(goToNextSlideVertical, readingTimeSeconds * 1000);
+                        slideTimerV = setTimeout(advanceOnceV, readingTimeSeconds * 1000);
                     });
                 }
 
@@ -223,19 +238,16 @@
                     let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
                         ? (video.duration + 2)
                         : (readingTimeSeconds + 3);
-                    slideTimerV = setTimeout(goToNextSlideVertical, Math.min(duration, 300) * 1000);
+                    slideTimerV = setTimeout(advanceOnceV, Math.min(duration, 600) * 1000);
                 };
 
                 if (video.readyState >= 1) {
                     checkDurationAndSetTimer();
                 } else {
                     video.onloadedmetadata = checkDurationAndSetTimer;
-                    slideTimerV = setTimeout(goToNextSlideVertical, (readingTimeSeconds + 5) * 1000);
+                    slideTimerV = setTimeout(advanceOnceV, (readingTimeSeconds + 5) * 1000);
                 }
             } else {
-                if (keepAlive) {
-                    try { keepAlive.play().catch(() => {}); } catch(e) {}
-                }
                 slideTimerV = setTimeout(() => { goToNextSlideVertical(); }, readingTimeSeconds * 1000);
             }
         }
@@ -243,7 +255,7 @@
         $(document).ready(runVerticalSequence);
 
         // -------------------------------------------------------------
-        // 1. SISTEMA ANTI-HIBERNAÇÃO E ANTI-SLEEP MULTI-CAMADA PARA SMART TVS
+        // 1. SISTEMA PROFISSIONAL ANTI-HIBERNAÇÃO PARA SMART TV VERTICAL
         // -------------------------------------------------------------
         let wakeLockV = null;
         async function acquireWakeLockV() {
@@ -254,12 +266,50 @@
             } catch (err) {}
         }
 
-        function ensureKeepAliveVideoV() {
-            const v = document.getElementById('keepAliveMediaV');
-            if (v && v.paused) {
-                v.muted = true;
-                v.play().catch(() => {});
+        function keepSmartTVAwakeV() {
+            try {
+                if (window.tizen && window.tizen.power) {
+                    window.tizen.power.request("SCREEN", "SCREEN_NORMAL");
+                }
+            } catch(e) {}
+            try {
+                if (window.webapis && window.webapis.appcommon) {
+                    window.webapis.appcommon.setScreenSaver(window.webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_OFF);
+                }
+            } catch(e) {}
+            try {
+                if (window.webOS && window.webOS.service) {
+                    window.webOS.service.request("luna://com.webos.service.power", {
+                        method: "turnOnScreen",
+                        parameters: {},
+                        onSuccess: function() {},
+                        onFailure: function() {}
+                    });
+                }
+            } catch(e) {}
+        }
+
+        function initCanvasStreamKeepAliveV() {
+            const canvas = document.getElementById('keepAliveCanvasV');
+            const video = document.getElementById('keepAliveMediaV');
+            if (!canvas || !video) return;
+            const ctx = canvas.getContext('2d');
+            let frame = 0;
+            function drawLoop() {
+                frame++;
+                ctx.fillStyle = (frame % 2 === 0) ? '#020202' : '#010101';
+                ctx.fillRect(0, 0, 16, 16);
+                requestAnimationFrame(drawLoop);
             }
+            drawLoop();
+            try {
+                if (canvas.captureStream && !video.srcObject) {
+                    video.srcObject = canvas.captureStream(15);
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.play().catch(() => {});
+                }
+            } catch(e) {}
         }
 
         let audioCtxV = null;
@@ -270,12 +320,13 @@
                     audioCtxV = new AudioContext();
                 }
                 if (audioCtxV && audioCtxV.state === 'suspended') {
-                    audioCtxV.resume();
+                    audioCtxV.resume().catch(() => {});
                 }
                 if (audioCtxV) {
                     const osc = audioCtxV.createOscillator();
                     const gain = audioCtxV.createGain();
-                    gain.gain.setValueAtTime(0.0001, audioCtxV.currentTime);
+                    gain.gain.setValueAtTime(0.00001, audioCtxV.currentTime);
+                    osc.frequency.setValueAtTime(40, audioCtxV.currentTime);
                     osc.connect(gain);
                     gain.connect(audioCtxV.destination);
                     osc.start();
@@ -284,33 +335,40 @@
             } catch (e) {}
         }
 
-        function canvasHeartbeatV() {
-            const canvas = document.getElementById('keepAliveCanvasV');
-            if (canvas && canvas.getContext) {
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = (Date.now() % 2 === 0) ? '#000000' : '#010101';
-                ctx.fillRect(0, 0, 2, 2);
-            }
+        function syntheticActivityHeartbeatV() {
+            try {
+                window.dispatchEvent(new MouseEvent('mousemove', { clientX: 2, clientY: 2 }));
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
+                if (window.scrollY === 0) {
+                    window.scrollTo(0, 1);
+                } else {
+                    window.scrollTo(0, 0);
+                }
+            } catch (e) {}
         }
 
         $(document).ready(function() {
             acquireWakeLockV();
-            ensureKeepAliveVideoV();
-            setInterval(acquireWakeLockV, 60000);
-            setInterval(ensureKeepAliveVideoV, 15000);
-            setInterval(audioPulseV, 20000);
-            setInterval(canvasHeartbeatV, 3000);
+            keepSmartTVAwakeV();
+            initCanvasStreamKeepAliveV();
+            audioPulseV();
+
+            setInterval(acquireWakeLockV, 25000);
+            setInterval(keepSmartTVAwakeV, 15000);
+            setInterval(audioPulseV, 12000);
+            setInterval(syntheticActivityHeartbeatV, 5000);
         });
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 acquireWakeLockV();
-                ensureKeepAliveVideoV();
+                keepSmartTVAwakeV();
+                audioPulseV();
             }
         });
         $(document).on('click touchstart mousemove keydown', () => {
             acquireWakeLockV();
-            ensureKeepAliveVideoV();
+            keepSmartTVAwakeV();
             audioPulseV();
         });
 
@@ -364,9 +422,10 @@
             window.location.reload(true);
         }, 6 * 60 * 60 * 1000);
     </script>
-    <video id="keepAliveMediaV" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
+    <!-- Elementos de KeepAlive / Anti-Sleep (Pipeline de Vídeo em Hardware) -->
+    <video id="keepAliveMediaV" style="position:fixed; bottom:0; right:0; width:16px; height:16px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
         <source src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZDEAAAAIZnJlZQAAACBtZGF0AAAAABwEAAEAAABAAAAAAAAAAADgAAAAPA==" type="video/mp4">
     </video>
-    <canvas id="keepAliveCanvasV" width="2" height="2" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
+    <canvas id="keepAliveCanvasV" width="16" height="16" style="position:fixed; bottom:0; right:0; width:16px; height:16px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
 </body>
 </html>

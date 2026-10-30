@@ -157,9 +157,8 @@
         setInterval(updateClock, 1000);
         updateClock();
 
-        // MOTOR DE TRANSIÇÃO DIRETO E ULTRA-LEVE (OTIMIZADO PARA SMART TVS)
+        // MOTOR DE TRANSIÇÃO DIRETO E ULTRA-LEVE (OTIMIZADO PARA SMART TVS & VÍDEOS)
         let slideTimer = null;
-        let isTransitioning = false;
 
         function goToNextSlide() {
             clearTimeout(slideTimer);
@@ -167,7 +166,7 @@
             if (!items || items.length === 0) return;
 
             if (items.length === 1) {
-                // Apenas 1 slide: roda novamente
+                // Apenas 1 slide: roda novamente o mesmo conteúdo
                 playCurrentSlide();
                 return;
             }
@@ -181,10 +180,10 @@
 
             const nextIndex = (currentIndex + 1) % items.length;
 
-            // Pausa e reseta todos os vídeos imediatamente
+            // Pausa e reseta todos os vídeos imediatamente para economizar recursos
             items.forEach(item => {
                 const v = item.querySelector('video');
-                if (v) {
+                if (v && v.id !== 'keepAliveMedia') {
                     try {
                         v.pause();
                         v.currentTime = 0;
@@ -205,60 +204,62 @@
             const activeItem = document.querySelector('#tvCarousel .carousel-item.active');
             if (!activeItem) return;
 
-            const readingTimeSeconds = parseInt(activeItem.getAttribute('data-reading-time')) || 12;
-            const video = activeItem.querySelector('video:not(#keepAliveMedia)');
-            const keepAlive = document.getElementById('keepAliveMedia');
+            const readingTimeSeconds = parseInt(activeItem.getAttribute('data-reading-time')) || 15;
+            const video = activeItem.querySelector('video.tv-slide-video') || activeItem.querySelector('video:not(#keepAliveMedia)');
 
             if (video) {
-                // Pausa o keepAlive para liberar a GPU da Smart TV para o vídeo do slide
-                if (keepAlive) {
-                    try { keepAlive.pause(); } catch(e) {}
-                }
-
                 video.muted = true;
                 video.playsInline = true;
                 try {
                     video.currentTime = 0;
                 } catch(e) {}
 
-                video.onended = () => {
+                let hasAdvanced = false;
+                const advanceOnce = () => {
+                    if (hasAdvanced) return;
+                    hasAdvanced = true;
                     goToNextSlide();
+                };
+
+                video.onended = advanceOnce;
+                video.ontimeupdate = () => {
+                    if (video.duration && !isNaN(video.duration) && video.duration > 0) {
+                        if (video.currentTime >= video.duration - 0.4) {
+                            advanceOnce();
+                        }
+                    }
                 };
 
                 video.onerror = (e) => {
                     console.warn('Erro ao decodificar vídeo. Pulando para o próximo slide...', e);
-                    setTimeout(goToNextSlide, 1000);
+                    setTimeout(advanceOnce, 1500);
                 };
 
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(err => {
                         console.warn('Autoplay bloqueado pelo navegador da TV:', err);
-                        slideTimer = setTimeout(goToNextSlide, readingTimeSeconds * 1000);
+                        slideTimer = setTimeout(advanceOnce, readingTimeSeconds * 1000);
                     });
                 }
 
-                // Watchdog de segurança para Smart TVs: avança se o vídeo travar
-                const setWatchdog = () => {
+                // Watchdog dinâmico de segurança: avança caso o vídeo trave ou não dispare onended
+                const armWatchdog = () => {
                     let duration = (video.duration && !isNaN(video.duration) && video.duration > 0)
                         ? (video.duration + 2)
                         : (readingTimeSeconds + 3);
-                    slideTimer = setTimeout(goToNextSlide, Math.min(duration, 300) * 1000);
+                    slideTimer = setTimeout(advanceOnce, Math.min(duration, 600) * 1000);
                 };
 
                 if (video.readyState >= 1) {
-                    setWatchdog();
+                    armWatchdog();
                 } else {
-                    video.onloadedmetadata = setWatchdog;
-                    slideTimer = setTimeout(goToNextSlide, (readingTimeSeconds + 4) * 1000);
+                    video.onloadedmetadata = armWatchdog;
+                    slideTimer = setTimeout(advanceOnce, (readingTimeSeconds + 4) * 1000);
                 }
 
             } else {
-                // Para slides normais (imagens, notícias), reativa keepAlive
-                if (keepAlive) {
-                    try { keepAlive.play().catch(() => {}); } catch(e) {}
-                }
-
+                // Para slides normais (imagens, embeds/iframes, notícias)
                 slideTimer = setTimeout(goToNextSlide, readingTimeSeconds * 1000);
             }
         }
@@ -268,43 +269,84 @@
             playCurrentSlide();
         });
 
-        // -------------------------------------------------------------
-        // 1. SISTEMA ANTI-HIBERNAÇÃO E ANTI-SLEEP MULTI-CAMADA PARA SMART TVS
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // 1. SISTEMA PROFISSIONAL ANTI-HIBERNAÇÃO & KEEP-AWAKE PARA SMART TVS
+        // ---------------------------------------------------------------------
+        
+        // A) Screen Wake Lock API
         let wakeLock = null;
-        async function acquireWakeLock() {
+        async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => {
-                        console.log('WakeLock liberado.');
-                    });
                 }
             } catch (err) {}
         }
 
-        function ensureKeepAliveVideo() {
-            const v = document.getElementById('keepAliveMedia');
-            if (v && v.paused) {
-                v.muted = true;
-                v.play().catch(() => {});
-            }
+        // B) APIs Nativas de Fabricantes de Smart TV (Samsung Tizen, LG webOS)
+        function keepSmartTVAwake() {
+            try {
+                if (window.tizen && window.tizen.power) {
+                    window.tizen.power.request("SCREEN", "SCREEN_NORMAL");
+                }
+            } catch(e) {}
+            try {
+                if (window.webapis && window.webapis.appcommon) {
+                    window.webapis.appcommon.setScreenSaver(window.webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_OFF);
+                }
+            } catch(e) {}
+            try {
+                if (window.webOS && window.webOS.service) {
+                    window.webOS.service.request("luna://com.webos.service.power", {
+                        method: "turnOnScreen",
+                        parameters: {},
+                        onSuccess: function() {},
+                        onFailure: function() {}
+                    });
+                }
+            } catch(e) {}
         }
 
+        // C) Pipeline de Decodificação Contínua de Vídeo em Hardware (Canvas Stream -> Video)
+        function initCanvasStreamKeepAlive() {
+            const canvas = document.getElementById('keepAliveCanvas');
+            const video = document.getElementById('keepAliveMedia');
+            if (!canvas || !video) return;
+            const ctx = canvas.getContext('2d');
+            let frame = 0;
+            function drawLoop() {
+                frame++;
+                ctx.fillStyle = (frame % 2 === 0) ? '#020202' : '#010101';
+                ctx.fillRect(0, 0, 16, 16);
+                requestAnimationFrame(drawLoop);
+            }
+            drawLoop();
+            try {
+                if (canvas.captureStream && !video.srcObject) {
+                    video.srcObject = canvas.captureStream(15);
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.play().catch(() => {});
+                }
+            } catch(e) {}
+        }
+
+        // D) Web Audio API Micro-Pulso Imperceptível
         let audioCtx = null;
-        function audioPulse() {
+        function sendAudioPulse() {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!audioCtx && AudioContext) {
                     audioCtx = new AudioContext();
                 }
                 if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume();
+                    audioCtx.resume().catch(() => {});
                 }
                 if (audioCtx) {
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
-                    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.00001, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(40, audioCtx.currentTime);
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
                     osc.start();
@@ -313,34 +355,43 @@
             } catch (e) {}
         }
 
-        function canvasHeartbeat() {
-            const canvas = document.getElementById('keepAliveCanvas');
-            if (canvas && canvas.getContext) {
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = (Date.now() % 2 === 0) ? '#000000' : '#010101';
-                ctx.fillRect(0, 0, 2, 2);
-            }
+        // E) Batimento de Atividade Sintética (Prevenção de Idle no Navegador da TV)
+        function syntheticActivityHeartbeat() {
+            try {
+                window.dispatchEvent(new MouseEvent('mousemove', { clientX: 2, clientY: 2 }));
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
+                if (window.scrollY === 0) {
+                    window.scrollTo(0, 1);
+                } else {
+                    window.scrollTo(0, 0);
+                }
+            } catch (e) {}
         }
 
         $(document).ready(function() {
-            acquireWakeLock();
-            ensureKeepAliveVideo();
-            setInterval(acquireWakeLock, 60000);
-            setInterval(ensureKeepAliveVideo, 15000);
-            setInterval(audioPulse, 20000);
-            setInterval(canvasHeartbeat, 3000);
+            requestWakeLock();
+            keepSmartTVAwake();
+            initCanvasStreamKeepAlive();
+            sendAudioPulse();
+
+            setInterval(requestWakeLock, 25000);
+            setInterval(keepSmartTVAwake, 15000);
+            setInterval(sendAudioPulse, 12000);
+            setInterval(syntheticActivityHeartbeat, 5000);
         });
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                acquireWakeLock();
-                ensureKeepAliveVideo();
+                requestWakeLock();
+                keepSmartTVAwake();
+                sendAudioPulse();
             }
         });
+
         $(document).on('click touchstart mousemove keydown', () => {
-            acquireWakeLock();
-            ensureKeepAliveVideo();
-            audioPulse();
+            requestWakeLock();
+            keepSmartTVAwake();
+            sendAudioPulse();
         });
 
         // -------------------------------------------------------------
@@ -467,10 +518,10 @@
         });
     </script>
 
-    <!-- Elementos de KeepAlive / Anti-Sleep -->
-    <video id="keepAliveMedia" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
+    <!-- Elementos de KeepAlive / Anti-Sleep (Pipeline de Vídeo em Hardware) -->
+    <video id="keepAliveMedia" style="position:fixed; bottom:0; right:0; width:16px; height:16px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
         <source src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZDEAAAAIZnJlZQAAACBtZGF0AAAAABwEAAEAAABAAAAAAAAAAADgAAAAPA==" type="video/mp4">
     </video>
-    <canvas id="keepAliveCanvas" width="2" height="2" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
+    <canvas id="keepAliveCanvas" width="16" height="16" style="position:fixed; bottom:0; right:0; width:16px; height:16px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
 </body>
 </html>

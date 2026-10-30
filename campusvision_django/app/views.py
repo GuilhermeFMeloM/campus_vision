@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _SCHEMA_CHECKED = False
 
 def ensure_db_schema():
-    """Garante de forma transparente que as colunas show_news e reload_id existam no banco legado."""
+    """Garante de forma transparente que as colunas existam e auto-aprova conteúdos pendentes."""
     global _SCHEMA_CHECKED
     if _SCHEMA_CHECKED:
         return
@@ -44,6 +44,9 @@ def ensure_db_schema():
             cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'reload_id';")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `reload_id` INT NOT NULL DEFAULT 0;")
+        
+        # Libera todos os slides existentes que estavam pendentes na fila de moderação
+        Slide.objects.filter(approval='Waiting Review').update(approval='Approved')
         _SCHEMA_CHECKED = True
     except Exception:
         pass

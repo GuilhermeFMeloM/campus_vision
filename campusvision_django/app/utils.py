@@ -26,22 +26,45 @@ def allowed_file(filename, allowed_ext=None):
 
 def feed_matches(target_feed, feeds_val):
     """Verifica de forma case-insensitive e tolerante se o slide pertence ao feed especificado."""
-    if not target_feed or not feeds_val:
+    if not target_feed:
         return False
     target = str(target_feed).strip().lower()
+
+    # Se não houver feed definido no slide, assume broadcast universal
+    if not feeds_val or str(feeds_val).strip() in ('', 'None', 'null', '[]', "['']"):
+        return True
+
     feeds_str = str(feeds_val).strip().lower()
 
+    # Caso direto (ex: 'p1eqpt1' in "['p1eqpt1', 'p1eqpt2']")
     if target in feeds_str:
         return True
 
-    # Parse caso esteja no formato lista string "['feed1', 'feed2']"
+    # Broadcast global/universal para todas as TVs
+    wildcards = {'all', '__all__', 'todas', 'todos', 'all_screens', 'global', '*', 'todas as telas'}
+    if any(w in feeds_str for w in wildcards):
+        return True
+
+    # Se o slide foi salvo no feed inicial 'default', permite reprodução
+    if target == 'default' or feeds_str in ('default', "['default']", "('default',)", "{'default'}"):
+        return True
+
+    # Parse de lista/tupla/conjunto em formato string
     import ast
     try:
         parsed = ast.literal_eval(str(feeds_val))
         if isinstance(parsed, (list, tuple, set)):
-            return any(str(item).strip().lower() == target for item in parsed)
+            for item in parsed:
+                clean_item = str(item).strip().lower()
+                if clean_item == target or clean_item in wildcards or clean_item == 'default':
+                    return True
     except Exception:
         pass
+
+    # Separação por vírgula caso seja string plana "p1eqpt1, p1eqpt2"
+    tokens = [t.strip().strip("'\"[](){}").lower() for t in feeds_str.split(',') if t.strip()]
+    if any(t == target or t in wildcards or t == 'default' for t in tokens):
+        return True
 
     return False
 
@@ -118,14 +141,26 @@ def remove_slide(slide_id):
         return 0
 
 def parse_date_safe(date_str):
-    """Faz parse seguro de data suportando vários formatos."""
-    if not date_str:
+    """Faz parse seguro de data suportando múltiplos formatos e evitando expiração indevida."""
+    if not date_str or str(date_str).strip() in ('', 'None', 'null', '0000-00-00', 'undefined'):
         return None
-    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y'):
+    date_str_clean = str(date_str).strip()
+    for fmt in (
+        '%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d', '%d-%m-%Y',
+        '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ',
+        '%d/%m/%y', '%m/%d/%Y', '%Y%m%d'
+    ):
         try:
-            return datetime.strptime(str(date_str).strip(), fmt).date()
-        except ValueError:
+            return datetime.strptime(date_str_clean, fmt).date()
+        except (ValueError, TypeError):
             continue
+    import re
+    match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})', date_str_clean)
+    if match:
+        try:
+            return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3))).date()
+        except Exception:
+            pass
     return None
 
 def is_news_enabled_for_feed(target_feed):
@@ -141,13 +176,16 @@ def is_news_enabled_for_feed(target_feed):
     return True
 
 def get_slides(target_feed, interleave_news=None):
-    """Busca slides aprovados para um feed específico e intercala com páginas dinâmicas de notícias (se habilitado)."""
+    """Busca slides ativos para um feed específico e intercala com notícias (se habilitado)."""
     if interleave_news is None:
         interleave_news = is_news_enabled_for_feed(target_feed)
 
     user_slides = []
     today_date = timezone.now().date()
-    for slide in Slide.objects.filter(approval='Approved').order_by('-id'):
+    
+    # Considera todos os slides que não foram reprovados explicitamente
+    slides_query = Slide.objects.exclude(approval__in=['Denied', 'denied', 'Reprovado', '0']).order_by('-id')
+    for slide in slides_query:
         start_date = parse_date_safe(slide.time_start)
         end_date = parse_date_safe(slide.time_end)
 
@@ -157,16 +195,17 @@ def get_slides(target_feed, interleave_news=None):
         if end_date and today_date > end_date:
             is_valid_date = False
 
-        if feed_matches(target_feed, slide.feeds) and is_valid_date:
+        if is_valid_date and feed_matches(target_feed, slide.feeds):
             path_lower = slide.slide_path.strip().lower()
             if path_lower.startswith(('http://', 'https://')):
                 s_type = 'embed'
-            elif path_lower.endswith(('.mp4', '.webm')):
+            elif path_lower.endswith(('.mp4', '.webm', '.mkv', '.mov', '.avi')):
                 s_type = 'video'
             else:
                 s_type = 'image'
 
             user_slides.append({
+                'id': slide.id,
                 'type': s_type,
                 'slide_path': slide.slide_path.strip(),
                 'reading_time': slide.reading_time or 15,
@@ -230,7 +269,7 @@ def get_slides(target_feed, interleave_news=None):
 def get_video(target_feed):
     """Busca o primeiro vídeo aprovado para o feed."""
     today_date = timezone.now().date()
-    for slide in Slide.objects.filter(approval='Approved').order_by('-id'):
+    for slide in Slide.objects.exclude(approval__in=['Denied', 'denied', 'Reprovado', '0']).order_by('-id'):
         start_date = parse_date_safe(slide.time_start)
         end_date = parse_date_safe(slide.time_end)
 
@@ -240,8 +279,8 @@ def get_video(target_feed):
         if end_date and today_date > end_date:
             is_valid = False
 
-        if feed_matches(target_feed, slide.feeds) and is_valid:
-            if slide.slide_path.lower().endswith(('.mp4', '.webm')):
+        if is_valid and feed_matches(target_feed, slide.feeds):
+            if slide.slide_path.lower().endswith(('.mp4', '.webm', '.mkv', '.mov')):
                 return slide.slide_path
     return ""
 
