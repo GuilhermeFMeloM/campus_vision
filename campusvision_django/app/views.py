@@ -15,6 +15,7 @@ from django.core.paginator import Paginator
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
+from django.db import connection
 
 from .utils import (
     mod_counter, alert_status, add_message, add_slide, allowed_file, appr_slide,
@@ -26,6 +27,22 @@ from .models import Message, Slide, Room, FeedStatus, User, BusSchedule
 from .forms import CustomUserCreationForm
 
 logger = logging.getLogger(__name__)
+
+_SCHEMA_CHECKED = False
+
+def ensure_db_schema():
+    """Garante de forma transparente que a coluna show_news exista no banco legado."""
+    global _SCHEMA_CHECKED
+    if _SCHEMA_CHECKED:
+        return
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'show_news';")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `show_news` TINYINT(1) NOT NULL DEFAULT 1;")
+        _SCHEMA_CHECKED = True
+    except Exception:
+        pass
 
 def get_current_user_name(request):
     """Retorna o nome do usuário autenticado ou perfil padrão."""
@@ -81,6 +98,7 @@ def logout_view(request):
 
 def index(request):
     """Página inicial com estatísticas e feeds disponíveis."""
+    ensure_db_schema()
     settings_obj = get_settings()
     try:
         feeds_list = ast.literal_eval(settings_obj.feeds)
@@ -410,6 +428,7 @@ def settings_view(request):
 
 def feeds(request, title):
     """Exibição principal da TV com Slides, Notícias, Clima e Ônibus."""
+    ensure_db_schema()
     update_feed_access(title)
     settings_obj = get_settings()
     weather_data = get_weather_data()
@@ -431,6 +450,7 @@ def feeds(request, title):
 
 def feeds_vertical(request, title):
     """Exibição para telas verticais (Totens)."""
+    ensure_db_schema()
     update_feed_access(title)
     settings_obj = get_settings()
     return render(request, 'app/feed_vertical.html', {
@@ -446,6 +466,7 @@ def feeds_vertical(request, title):
     })
 
 def feeds_video(request, title):
+    ensure_db_schema()
     update_feed_access(title)
     return render(request, 'app/feed-video.html', {
         'title': title,
@@ -458,6 +479,7 @@ def feeds_video(request, title):
     })
 
 def status(request):
+    ensure_db_schema()
     return render(request, 'app/status.html', {
         'title': 'Status Operacional das Telas',
         'rooms': FeedStatus.objects.all(),
@@ -467,6 +489,7 @@ def status(request):
 
 def configuration_equipment(request):
     """Gerenciamento e configuração de equipamentos e salas, incluindo flag de notícias."""
+    ensure_db_schema()
     settings_obj = get_settings()
     try:
         feeds_list = ast.literal_eval(settings_obj.feeds)
@@ -597,6 +620,7 @@ def bus_manager(request):
 
 def api_feed_data(request, feed_name):
     """Retorna todos os dados da TV em JSON para atualização em tempo real."""
+    ensure_db_schema()
     update_feed_access(feed_name)
     slides = get_slides(feed_name)
     weather = get_weather_data()

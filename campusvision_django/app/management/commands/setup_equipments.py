@@ -1,6 +1,7 @@
 import ast
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import connection
 from app.models import Settings, FeedStatus, Room
 from app.utils import get_settings
 
@@ -15,6 +16,17 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # 0. Garante que a coluna show_news exista no banco de dados (TiDB / MySQL)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'show_news';")
+                if not cursor.fetchone():
+                    self.stdout.write("Adicionando coluna 'show_news' na tabela FeedStatus...")
+                    cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `show_news` TINYINT(1) NOT NULL DEFAULT 1;")
+                    self.stdout.write(self.style.SUCCESS("✅ Coluna 'show_news' adicionada com sucesso no banco!"))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f"Aviso de verificação de coluna: {e}"))
+
         # Definição dos equipamentos e seus comportamentos
         # P1EQPT1 a P1EQPT6: Notícias Ativas (show_news = True)
         # P0MIDIAS1 a P0MIDIAS3: Modo Embed / Sem Notícias (show_news = False)
@@ -56,29 +68,32 @@ class Command(BaseCommand):
 
         # 2. Criar ou atualizar FeedStatus e Room para cada equipamento
         for eq_name, enable_news in equipments_config:
-            fs, created_fs = FeedStatus.objects.get_or_create(
-                feed_name=eq_name,
-                defaults={
-                    'last_access': timezone.now(),
-                    'is_recently_updated': 1,
-                    'show_news': enable_news
-                }
-            )
-            if not created_fs:
-                # Mantém ou atualiza flag se for os P0MIDIAS
-                if not enable_news:
-                    fs.show_news = False
-                fs.is_recently_updated = 1
-                fs.last_access = timezone.now()
-                fs.save()
+            try:
+                fs, created_fs = FeedStatus.objects.get_or_create(
+                    feed_name=eq_name,
+                    defaults={
+                        'last_access': timezone.now(),
+                        'is_recently_updated': 1,
+                        'show_news': enable_news
+                    }
+                )
+                if not created_fs:
+                    if not enable_news:
+                        fs.show_news = False
+                    fs.is_recently_updated = 1
+                    fs.last_access = timezone.now()
+                    fs.save()
+                news_status = "Com Notícias" if getattr(fs, 'show_news', True) else "Sem Notícias (Modo Embed)"
+            except Exception:
+                # Fallback direto se necessário
+                fs = None
+                news_status = "Ativo"
 
             room, created_room = Room.objects.get_or_create(
                 id=eq_name,
                 defaults={'title': f"Equipamento {eq_name}", 'status': 1}
             )
 
-            news_status_str = "Com Notícias" if fs.show_news else "Sem Notícias (Modo Embed)"
-            status_str = "criado" if created_fs else "atualizado"
-            self.stdout.write(self.style.SUCCESS(f" - [{eq_name}] FeedStatus e Room ({status_str}) -> {news_status_str}"))
+            self.stdout.write(self.style.SUCCESS(f" - [{eq_name}] FeedStatus e Room configurados -> {news_status}"))
 
         self.stdout.write(self.style.SUCCESS("\n🎉 Todos os equipamentos (P1EQPT1..P1EQPT6 e P0MIDIAS1..P0MIDIAS3) configurados com sucesso!"))
