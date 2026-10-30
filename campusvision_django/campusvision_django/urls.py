@@ -21,6 +21,7 @@ urlpatterns = [
 
     # Painel Principal e Gerenciamento
     path('', views.index, name='index'),
+    path('home/', views.index, name='home'),
     path('manager/', views.manager, name='manager'),
     path('manager/approved/', views.manager_approved, name='manager_approved'),
     path('manager/waiting/', views.manager_waiting, name='manager_waiting'),
