@@ -177,6 +177,7 @@ class FeedStatus(models.Model):
     last_access = models.DateTimeField(default=timezone.now)
     is_recently_updated = models.IntegerField(default=0)
     show_news = models.BooleanField(default=True, help_text="Exibir notícias dinâmicas intercaladas neste equipamento")
+    reload_id = models.IntegerField(default=0, help_text="Contador para forçar recarregamento remoto da TV")
 
     class Meta:
         db_table = 'FeedStatus'

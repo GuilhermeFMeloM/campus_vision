@@ -65,8 +65,20 @@
         <div class="col-lg-8 mb-4">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
-                    <h5 class="mb-0 font-weight-bold"><i class="fa fa-list"></i> Equipamentos Ativos no Sistema</h5>
-                    <span class="badge bg-primary fs-6">{{ rooms|length }} TV(s)</span>
+                    <div>
+                        <h5 class="mb-0 font-weight-bold d-inline-block me-2"><i class="fa fa-list"></i> Equipamentos Ativos</h5>
+                        <span class="badge bg-primary fs-6">{{ rooms|length }} TV(s)</span>
+                    </div>
+                    <div>
+                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline" onsubmit="return confirm('Deseja enviar comando de recarregamento imediato para TODAS as TVs conectadas?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="reload">
+                            <input type="hidden" name="feed_name" value="__ALL__">
+                            <button type="submit" class="btn btn-warning btn-sm font-weight-bold shadow-sm" title="Força a atualização imediata em todos os televisores ligados">
+                                <i class="fa fa-refresh fa-spin-hover"></i> Recarregar Todas as TVs
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -123,13 +135,21 @@
                                         </span>
                                     </td>
                                     <td class="text-end">
-                                        <a href="{{ room.url_horizontal }}" target="_blank" class="btn btn-primary btn-sm" title="Abrir transmissão padrão (Horizontal 16:9)">
+                                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline" title="Forçar a TV a recarregar o conteúdo agora">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="reload">
+                                            <input type="hidden" name="feed_name" value="{{ room.feed_name }}">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Recarregar esta TV remotamente">
+                                                <i class="fa fa-refresh"></i> Recarregar
+                                            </button>
+                                        </form>
+                                        <a href="{{ room.url_horizontal }}" target="_blank" class="btn btn-primary btn-sm ms-1" title="Abrir transmissão padrão (Horizontal 16:9)">
                                             <i class="fa fa-play-circle"></i> Abrir TV
                                         </a>
-                                        <a href="{{ room.url_vertical }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Abrir transmissão para Totem (Vertical 9:16)">
+                                        <a href="{{ room.url_vertical }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-1" title="Abrir transmissão para Totem (Vertical 9:16)">
                                             <i class="fa fa-mobile"></i> Totem
                                         </a>
-                                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline" onsubmit="return confirm('Tem certeza que deseja remover este equipamento?');">
+                                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline ms-1" onsubmit="return confirm('Tem certeza que deseja remover este equipamento?');">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="delete">
                                             <input type="hidden" name="feed_name" value="{{ room.feed_name }}">

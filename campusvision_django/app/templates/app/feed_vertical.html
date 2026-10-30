@@ -242,23 +242,124 @@
 
         $(document).ready(runVerticalSequence);
 
-        // Anti-sleep Screen WakeLock
+        // -------------------------------------------------------------
+        // 1. SISTEMA ANTI-HIBERNAÇÃO E ANTI-SLEEP MULTI-CAMADA PARA SMART TVS
+        // -------------------------------------------------------------
         let wakeLockV = null;
-        async function requestWakeLockV() {
+        async function acquireWakeLockV() {
             try {
                 if ('wakeLock' in navigator) {
                     wakeLockV = await navigator.wakeLock.request('screen');
-                    console.log('✅ Screen WakeLock vertical ativo');
                 }
-            } catch (err) {
-                console.log('WakeLock erro:', err);
+            } catch (err) {}
+        }
+
+        function ensureKeepAliveVideoV() {
+            const v = document.getElementById('keepAliveMediaV');
+            if (v && v.paused) {
+                v.muted = true;
+                v.play().catch(() => {});
             }
         }
-        $(document).ready(requestWakeLockV);
-        $(document).on('click touchstart', requestWakeLockV);
+
+        let audioCtxV = null;
+        function audioPulseV() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtxV && AudioContext) {
+                    audioCtxV = new AudioContext();
+                }
+                if (audioCtxV && audioCtxV.state === 'suspended') {
+                    audioCtxV.resume();
+                }
+                if (audioCtxV) {
+                    const osc = audioCtxV.createOscillator();
+                    const gain = audioCtxV.createGain();
+                    gain.gain.setValueAtTime(0.0001, audioCtxV.currentTime);
+                    osc.connect(gain);
+                    gain.connect(audioCtxV.destination);
+                    osc.start();
+                    osc.stop(audioCtxV.currentTime + 0.05);
+                }
+            } catch (e) {}
+        }
+
+        function canvasHeartbeatV() {
+            const canvas = document.getElementById('keepAliveCanvasV');
+            if (canvas && canvas.getContext) {
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = (Date.now() % 2 === 0) ? '#000000' : '#010101';
+                ctx.fillRect(0, 0, 2, 2);
+            }
+        }
+
+        $(document).ready(function() {
+            acquireWakeLockV();
+            ensureKeepAliveVideoV();
+            setInterval(acquireWakeLockV, 60000);
+            setInterval(ensureKeepAliveVideoV, 15000);
+            setInterval(audioPulseV, 20000);
+            setInterval(canvasHeartbeatV, 3000);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                acquireWakeLockV();
+                ensureKeepAliveVideoV();
+            }
+        });
+        $(document).on('click touchstart mousemove keydown', () => {
+            acquireWakeLockV();
+            ensureKeepAliveVideoV();
+            audioPulseV();
+        });
+
+        // -------------------------------------------------------------
+        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO INSTANTÂNEO
+        // -------------------------------------------------------------
+        const FEED_NAME_V = "{{ title }}";
+        let lastReloadIdV = parseInt("{{ reload_id|default:0 }}") || 0;
+        let lastSlidesSignatureV = "";
+
+        function checkRemoteUpdatesV() {
+            $.getJSON(`/api/feed/${FEED_NAME_V}/`, function(data) {
+                if (!data) return;
+
+                if (data.reload_id !== undefined && data.reload_id !== null) {
+                    const serverReloadId = parseInt(data.reload_id);
+                    if (serverReloadId > lastReloadIdV) {
+                        console.log(`[SmartTV Vertical] Recarregamento remoto (${serverReloadId} > ${lastReloadIdV}). Recarregando...`);
+                        window.location.reload(true);
+                        return;
+                    }
+                }
+
+                if (data.slides && Array.isArray(data.slides)) {
+                    const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
+                    if (lastSlidesSignatureV !== "" && currentSig !== lastSlidesSignatureV) {
+                        console.log("[SmartTV Vertical] Alteração na grade de slides. Recarregando...");
+                        window.location.reload(true);
+                        return;
+                    }
+                    lastSlidesSignatureV = currentSig;
+                }
+            }).fail(function(err) {
+                console.log("Erro na verificação:", err);
+            });
+        }
+
+        setInterval(checkRemoteUpdatesV, 10000);
+        $(document).ready(function() {
+            setTimeout(checkRemoteUpdatesV, 2000);
+        });
+
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 6 * 60 * 60 * 1000);
     </script>
-    <video id="keepAliveMediaV" style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;" autoplay loop muted playsinline>
-        <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAADpmcmVlAAAAG21kYXQAAAGzAAEAABg4AAAAABg8AAAACQAAAAB==" type="video/mp4">
+    <video id="keepAliveMediaV" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
+        <source src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZDEAAAAIZnJlZQAAACBtZGF0AAAAABwEAAEAAABAAAAAAAAAAADgAAAAPA==" type="video/mp4">
     </video>
+    <canvas id="keepAliveCanvasV" width="2" height="2" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
 </body>
 </html>

@@ -16,7 +16,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # 0. Garante que a coluna show_news exista no banco de dados (TiDB / MySQL)
+        # 0. Garante que as colunas show_news e reload_id existam no banco de dados (TiDB / MySQL)
         try:
             with connection.cursor() as cursor:
                 cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'show_news';")
@@ -24,6 +24,12 @@ class Command(BaseCommand):
                     self.stdout.write("Adicionando coluna 'show_news' na tabela FeedStatus...")
                     cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `show_news` TINYINT(1) NOT NULL DEFAULT 1;")
                     self.stdout.write(self.style.SUCCESS("✅ Coluna 'show_news' adicionada com sucesso no banco!"))
+
+                cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'reload_id';")
+                if not cursor.fetchone():
+                    self.stdout.write("Adicionando coluna 'reload_id' na tabela FeedStatus...")
+                    cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `reload_id` INT NOT NULL DEFAULT 0;")
+                    self.stdout.write(self.style.SUCCESS("✅ Coluna 'reload_id' adicionada com sucesso no banco!"))
         except Exception as e:
             self.stdout.write(self.style.WARNING(f"Aviso de verificação de coluna: {e}"))
 

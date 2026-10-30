@@ -268,12 +268,114 @@
             playCurrentSlide();
         });
 
-        // Sincronização em tempo real a cada 30s
+        // -------------------------------------------------------------
+        // 1. SISTEMA ANTI-HIBERNAÇÃO E ANTI-SLEEP MULTI-CAMADA PARA SMART TVS
+        // -------------------------------------------------------------
+        let wakeLock = null;
+        async function acquireWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        console.log('WakeLock liberado.');
+                    });
+                }
+            } catch (err) {}
+        }
+
+        function ensureKeepAliveVideo() {
+            const v = document.getElementById('keepAliveMedia');
+            if (v && v.paused) {
+                v.muted = true;
+                v.play().catch(() => {});
+            }
+        }
+
+        let audioCtx = null;
+        function audioPulse() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtx && AudioContext) {
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                if (audioCtx) {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.05);
+                }
+            } catch (e) {}
+        }
+
+        function canvasHeartbeat() {
+            const canvas = document.getElementById('keepAliveCanvas');
+            if (canvas && canvas.getContext) {
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = (Date.now() % 2 === 0) ? '#000000' : '#010101';
+                ctx.fillRect(0, 0, 2, 2);
+            }
+        }
+
+        $(document).ready(function() {
+            acquireWakeLock();
+            ensureKeepAliveVideo();
+            setInterval(acquireWakeLock, 60000);
+            setInterval(ensureKeepAliveVideo, 15000);
+            setInterval(audioPulse, 20000);
+            setInterval(canvasHeartbeat, 3000);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                acquireWakeLock();
+                ensureKeepAliveVideo();
+            }
+        });
+        $(document).on('click touchstart mousemove keydown', () => {
+            acquireWakeLock();
+            ensureKeepAliveVideo();
+            audioPulse();
+        });
+
+        // -------------------------------------------------------------
+        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO INSTANTÂNEO
+        // -------------------------------------------------------------
         const FEED_NAME = "{{ title }}";
-        function refreshFeedData() {
+        let lastReloadId = parseInt("{{ reload_id|default:0 }}") || 0;
+        let lastSlidesSignature = "";
+
+        function checkRemoteUpdates() {
             $.getJSON(`/api/feed/${FEED_NAME}/`, function(data) {
                 if (!data) return;
 
+                // A) Comando de Recarregamento Remoto Forçado
+                if (data.reload_id !== undefined && data.reload_id !== null) {
+                    const serverReloadId = parseInt(data.reload_id);
+                    if (serverReloadId > lastReloadId) {
+                        console.log(`[SmartTV] Comando de recarregamento remoto recebido (${serverReloadId} > ${lastReloadId}). Recarregando...`);
+                        window.location.reload(true);
+                        return;
+                    }
+                }
+
+                // B) Detecta se novos slides foram cadastrados ou removidos
+                if (data.slides && Array.isArray(data.slides)) {
+                    const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
+                    if (lastSlidesSignature !== "" && currentSig !== lastSlidesSignature) {
+                        console.log("[SmartTV] Grade de conteúdos alterada. Atualizando TV...");
+                        window.location.reload(true);
+                        return;
+                    }
+                    lastSlidesSignature = currentSig;
+                }
+
+                // C) Alerta Urgente em Tempo Real
                 if (data.alert) {
                     if ($('#alertBar').length === 0) {
                         $('.tv-screen-container').prepend(`
@@ -289,6 +391,7 @@
                     $('#alertBar').remove();
                 }
 
+                // D) Clima e Previsão
                 if (data.weather) {
                     $('#currentTemp').text(`${data.weather.temp_celsius}°`);
                     $('#cityName').html(`<i class="fa fa-map-marker text-danger"></i> ${data.weather.city}`);
@@ -309,6 +412,7 @@
                     }
                 }
 
+                // E) Ônibus
                 if (data.buses && data.buses.length > 0) {
                     let busHtml = '';
                     data.buses.slice(0, 3).forEach(b => {
@@ -323,6 +427,7 @@
                     $('#busList').html(busHtml);
                 }
 
+                // F) Mensagens Institucionais
                 if (data.messages && data.messages.length > 0) {
                     let tickerHtml = '';
                     data.messages.forEach(m => {
@@ -335,28 +440,16 @@
             });
         }
 
-        setInterval(refreshFeedData, 30000);
-
-        // Prevenção de Sleep
-        let wakeLock = null;
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('✅ Screen WakeLock ativo');
-                }
-            } catch (err) {
-                console.log('WakeLock:', err);
-            }
-        }
-
-        $(document).ready(requestWakeLock);
-        $(document).on('click touchstart', requestWakeLock);
-        document.addEventListener('visibilitychange', () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                requestWakeLock();
-            }
+        // Checagem frequente a cada 10 segundos
+        setInterval(checkRemoteUpdates, 10000);
+        $(document).ready(function() {
+            setTimeout(checkRemoteUpdates, 2000);
         });
+
+        // Watchdog de Autocura a cada 6h
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 6 * 60 * 60 * 1000);
 
         $(document).on('dblclick', function() {
             if (!document.fullscreenElement) {
@@ -367,8 +460,10 @@
         });
     </script>
 
-    <video id="keepAliveMedia" style="position:fixed; width:1px; height:1px; opacity:0.01; pointer-events:none;" autoplay loop muted playsinline>
-        <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAADpmcmVlAAAAG21kYXQAAAGzAAEAABg4AAAAABg8AAAACQAAAAB==" type="video/mp4">
+    <!-- Elementos de KeepAlive / Anti-Sleep -->
+    <video id="keepAliveMedia" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;" autoplay loop muted playsinline>
+        <source src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZDEAAAAIZnJlZQAAACBtZGF0AAAAABwEAAEAAABAAAAAAAAAAADgAAAAPA==" type="video/mp4">
     </video>
+    <canvas id="keepAliveCanvas" width="2" height="2" style="position:fixed; bottom:0; right:0; width:2px; height:2px; opacity:0.01; pointer-events:none; z-index:-1;"></canvas>
 </body>
 </html>

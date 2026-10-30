@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 _SCHEMA_CHECKED = False
 
 def ensure_db_schema():
-    """Garante de forma transparente que a coluna show_news exista no banco legado."""
+    """Garante de forma transparente que as colunas show_news e reload_id existam no banco legado."""
     global _SCHEMA_CHECKED
     if _SCHEMA_CHECKED:
         return
@@ -41,6 +41,9 @@ def ensure_db_schema():
             cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'show_news';")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `show_news` TINYINT(1) NOT NULL DEFAULT 1;")
+            cursor.execute("SHOW COLUMNS FROM `FeedStatus` LIKE 'reload_id';")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE `FeedStatus` ADD COLUMN `reload_id` INT NOT NULL DEFAULT 0;")
         _SCHEMA_CHECKED = True
     except Exception:
         pass
@@ -436,6 +439,8 @@ def feeds(request, title):
     bus_lines = get_bus_schedules()
     slides_data = get_slides(title)
     messages_data = get_message()
+    fs = FeedStatus.objects.filter(feed_name=title).first()
+    reload_id = getattr(fs, 'reload_id', 0) if fs else 0
 
     return render(request, 'app/feed.html', {
         'title': title,
@@ -445,6 +450,7 @@ def feeds(request, title):
         'messages': messages_data,
         'weather': weather_data,
         'buses': bus_lines,
+        'reload_id': reload_id,
         'background': f"{title}.webp",
         'weather_key': settings.WEATHER_KEY
     })
@@ -454,6 +460,9 @@ def feeds_vertical(request, title):
     ensure_db_schema()
     update_feed_access(title)
     settings_obj = get_settings()
+    fs = FeedStatus.objects.filter(feed_name=title).first()
+    reload_id = getattr(fs, 'reload_id', 0) if fs else 0
+
     return render(request, 'app/feed_vertical.html', {
         'title': title,
         'slides': get_slides(title),
@@ -462,6 +471,7 @@ def feeds_vertical(request, title):
         'messages': get_message(),
         'weather': get_weather_data(),
         'buses': get_bus_schedules(),
+        'reload_id': reload_id,
         'background': 'background-square.png',
         'weather_key': settings.WEATHER_KEY
     })
@@ -537,6 +547,21 @@ def configuration_equipment(request):
                     show_news=False
                 )
                 messages.success(request, f"Notícias desativadas para o equipamento {feed_name}.")
+        elif action == 'reload':
+            feed_name = request.POST.get('feed_name')
+            if feed_name == '__ALL__':
+                for item in FeedStatus.objects.all():
+                    item.reload_id = (getattr(item, 'reload_id', 0) or 0) + 1
+                    item.save()
+                messages.success(request, "🔄 Comando de recarregamento remoto enviado para TODAS as TVs! Elas atualizarão em instantes.")
+            else:
+                fs = FeedStatus.objects.filter(feed_name=feed_name).first()
+                if fs:
+                    fs.reload_id = (getattr(fs, 'reload_id', 0) or 0) + 1
+                    fs.save()
+                    messages.success(request, f"🔄 Comando de recarregamento remoto enviado para a TV '{feed_name}'. Ela atualizará em instantes!")
+                else:
+                    messages.warning(request, f"Equipamento '{feed_name}' não encontrado.")
         elif action == 'delete':
             feed_name = request.POST.get('feed_name')
             if feed_name in feeds_list:
@@ -638,6 +663,8 @@ def api_feed_data(request, feed_name):
         }
         for b in get_bus_schedules()
     ]
+    fs = FeedStatus.objects.filter(feed_name=feed_name).first()
+    reload_id = getattr(fs, 'reload_id', 0) if fs else 0
 
     return JsonResponse({
         'slides': slides,
@@ -645,5 +672,7 @@ def api_feed_data(request, feed_name):
         'weather': weather,
         'news': news,
         'buses': buses,
-        'messages': get_message()
+        'messages': get_message(),
+        'reload_id': reload_id,
+        'show_news': getattr(fs, 'show_news', True) if fs else True,
     })
