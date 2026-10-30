@@ -16,6 +16,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.db import connection
+from django.utils import timezone
 
 from .utils import (
     mod_counter, alert_status, add_message, add_slide, allowed_file, appr_slide,
@@ -531,7 +532,9 @@ def configuration_equipment(request):
             else:
                 FeedStatus.objects.create(
                     feed_name=feed_name,
-                    defaults={'last_access': timezone.now(), 'is_recently_updated': 1, 'show_news': False}
+                    last_access=timezone.now(),
+                    is_recently_updated=1,
+                    show_news=False
                 )
                 messages.success(request, f"Notícias desativadas para o equipamento {feed_name}.")
         elif action == 'delete':
