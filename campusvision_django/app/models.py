@@ -176,6 +176,7 @@ class FeedStatus(models.Model):
     feed_name = models.CharField(max_length=255, primary_key=True)
     last_access = models.DateTimeField(default=timezone.now)
     is_recently_updated = models.IntegerField(default=0)
+    show_news = models.BooleanField(default=True, help_text="Exibir notícias dinâmicas intercaladas neste equipamento")
 
     class Meta:
         db_table = 'FeedStatus'

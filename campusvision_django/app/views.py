@@ -20,7 +20,7 @@ from .utils import (
     mod_counter, alert_status, add_message, add_slide, allowed_file, appr_slide,
     remove_slide, update_alert, get_slides, get_message, update_settings, get_settings,
     update_slide, get_video, update_feed_access, get_news_feed, get_weather_data,
-    get_bus_schedules, signups_allowed
+    get_bus_schedules, signups_allowed, is_news_enabled_for_feed
 )
 from .models import Message, Slide, Room, FeedStatus, User, BusSchedule
 from .forms import CustomUserCreationForm
@@ -84,6 +84,8 @@ def index(request):
     settings_obj = get_settings()
     try:
         feeds_list = ast.literal_eval(settings_obj.feeds)
+        if not isinstance(feeds_list, list):
+            feeds_list = ['Default']
     except Exception:
         feeds_list = ['Default']
 
@@ -94,12 +96,14 @@ def index(request):
         fs = status_map.get(feed_name)
         is_online = bool(fs and fs.is_recently_updated == 1)
         last_seen = fs.last_access if fs else None
-        slides_count = len(get_slides(feed_name))
+        show_news = bool(getattr(fs, 'show_news', True)) if fs else True
+        slides_count = len(get_slides(feed_name, interleave_news=False))
         
         feed_details.append({
             'name': feed_name,
             'is_online': is_online,
             'last_access': last_seen,
+            'show_news': show_news,
             'slides_count': slides_count,
             'url_horizontal': reverse('feeds', kwargs={'title': feed_name}),
             'url_vertical': reverse('feeds_vertical', kwargs={'title': feed_name}),
@@ -462,9 +466,83 @@ def status(request):
     })
 
 def configuration_equipment(request):
+    """Gerenciamento e configuração de equipamentos e salas, incluindo flag de notícias."""
+    settings_obj = get_settings()
+    try:
+        feeds_list = ast.literal_eval(settings_obj.feeds)
+        if not isinstance(feeds_list, list):
+            feeds_list = []
+    except Exception:
+        feeds_list = []
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            feed_name = request.POST.get('feed_name', '').strip()
+            show_news = request.POST.get('show_news') == '1'
+            if feed_name:
+                fs, created = FeedStatus.objects.get_or_create(
+                    feed_name=feed_name,
+                    defaults={'last_access': timezone.now(), 'is_recently_updated': 1, 'show_news': show_news}
+                )
+                if not created:
+                    fs.show_news = show_news
+                    fs.save()
+
+                if feed_name not in feeds_list:
+                    feeds_list.append(feed_name)
+                    settings_obj.feeds = str(feeds_list)
+                    settings_obj.save()
+
+                Room.objects.get_or_create(id=feed_name, defaults={'title': f"Equipamento {feed_name}", 'status': 1})
+                status_news = "Ativadas" if show_news else "Desativadas"
+                messages.success(request, f"Equipamento '{feed_name}' salvo com sucesso! Notícias: {status_news}.")
+        elif action == 'toggle_news':
+            feed_name = request.POST.get('feed_name')
+            fs = FeedStatus.objects.filter(feed_name=feed_name).first()
+            if fs:
+                fs.show_news = not fs.show_news
+                fs.save()
+                status_str = "ativadas" if fs.show_news else "desativadas"
+                messages.success(request, f"Notícias {status_str} para o equipamento {feed_name}.")
+            else:
+                FeedStatus.objects.create(
+                    feed_name=feed_name,
+                    defaults={'last_access': timezone.now(), 'is_recently_updated': 1, 'show_news': False}
+                )
+                messages.success(request, f"Notícias desativadas para o equipamento {feed_name}.")
+        elif action == 'delete':
+            feed_name = request.POST.get('feed_name')
+            if feed_name in feeds_list:
+                feeds_list.remove(feed_name)
+                settings_obj.feeds = str(feeds_list)
+                settings_obj.save()
+            FeedStatus.objects.filter(feed_name=feed_name).delete()
+            Room.objects.filter(id=feed_name).delete()
+            messages.info(request, f"Equipamento {feed_name} removido.")
+
+        return redirect('configuration_equipment')
+
+    status_map = {fs.feed_name: fs for fs in FeedStatus.objects.all()}
+    all_equipments = []
+    
+    # Combina feeds de Settings com registros em FeedStatus
+    all_names = list(dict.fromkeys(feeds_list + [fs.feed_name for fs in FeedStatus.objects.all()]))
+    for name in all_names:
+        fs = status_map.get(name)
+        all_equipments.append({
+            'feed_name': name,
+            'is_online': bool(fs and fs.is_recently_updated == 1),
+            'last_access': fs.last_access if fs else None,
+            'show_news': bool(getattr(fs, 'show_news', True)) if fs else True,
+            'slides_count': len(get_slides(name, interleave_news=False)),
+            'url_horizontal': reverse('feeds', kwargs={'title': name}),
+            'url_vertical': reverse('feeds_vertical', kwargs={'title': name}),
+        })
+
     return render(request, 'app/configuration_equipment.html', {
         'title': 'Equipamentos e Salas',
-        'rooms': FeedStatus.objects.all(),
+        'rooms': all_equipments,
         'name': get_current_user_name(request),
         'mod_count': mod_counter()
     })

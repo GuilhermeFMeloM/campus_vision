@@ -48,8 +48,8 @@
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
         <h5 class="mb-0"><i class="fa fa-desktop text-primary me-2"></i> Monitoramento e Links Individuais de cada TV</h5>
-        <a href="{% url 'settings' %}" class="btn btn-outline-light btn-sm">
-            <i class="fa fa-plus-circle"></i> Gerenciar Pontos / Feeds
+        <a href="{% url 'configuration_equipment' %}" class="btn btn-outline-light btn-sm">
+            <i class="fa fa-cog"></i> Gerenciar Equipamentos & Notícias
         </a>
     </div>
     <div class="card-body p-0">
@@ -57,10 +57,11 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 250px;">Nome da TV / Ponto</th>
+                        <th style="width: 230px;">Nome da TV / Ponto</th>
                         <th>Status Operacional</th>
+                        <th>Notícias RSS</th>
                         <th>Programação Ativa</th>
-                        <th>Último Sinal (Heartbeat)</th>
+                        <th>Último Sinal</th>
                         <th class="text-end">Links de Transmissão</th>
                     </tr>
                 </thead>
@@ -68,46 +69,57 @@
                     {% for feed in feed_details %}
                     <tr>
                         <td>
-                            <strong class="fs-6">{{ feed.name }}</strong>
+                            <strong class="fs-6 text-dark">{{ feed.name }}</strong>
                             <br>
                             <small class="text-muted">ID: {{ feed.name|slugify }}</small>
                         </td>
                         <td>
                             {% if feed.is_online %}
                                 <span class="badge bg-success p-2">
-                                    <i class="fa fa-circle text-white me-1"></i> LIGADA / ONLINE
+                                    <i class="fa fa-circle text-white me-1"></i> ONLINE
                                 </span>
                             {% else %}
                                 <span class="badge bg-danger p-2">
-                                    <i class="fa fa-power-off text-white me-1"></i> DESLIGADA / OFFLINE
+                                    <i class="fa fa-power-off text-white me-1"></i> OFFLINE
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if feed.show_news %}
+                                <span class="badge bg-success bg-opacity-75 text-white" title="Notícias do G1/BBC intercaladas normalmente">
+                                    <i class="fa fa-check-circle"></i> Ativadas
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary text-white" title="Modo exclusivo para Embed / Slides sem notícias">
+                                    <i class="fa fa-ban"></i> Desativadas (Embed)
                                 </span>
                             {% endif %}
                         </td>
                         <td>
                             <span class="badge bg-info text-dark">
-                                <i class="fa fa-film"></i> {{ feed.slides_count }} slide(s) vinculados
+                                <i class="fa fa-film"></i> {{ feed.slides_count }} slide(s)
                             </span>
                         </td>
                         <td>
                             {% if feed.last_access %}
                                 <small class="text-muted">{{ feed.last_access|date:"d/m/Y H:i:s" }}</small>
                             {% else %}
-                                <small class="text-muted">Nenhum acesso recente</small>
+                                <small class="text-muted">Nenhum acesso</small>
                             {% endif %}
                         </td>
                         <td class="text-end">
                             <a href="{{ feed.url_horizontal }}" target="_blank" class="btn btn-primary btn-sm me-1" title="Abrir transmissão padrão (Horizontal 16:9)">
-                                <i class="fa fa-play-circle me-1"></i> Abrir TV (Horizontal)
+                                <i class="fa fa-play-circle me-1"></i> Abrir TV
                             </a>
                             <a href="{{ feed.url_vertical }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Abrir transmissão para Totem (Vertical 9:16)">
-                                <i class="fa fa-mobile me-1"></i> Totem (Vertical)
+                                <i class="fa fa-mobile me-1"></i> Totem
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">
-                            Nenhum ponto de TV cadastrado. Adicione nas <a href="{% url 'settings' %}">Configurações</a>.
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            Nenhum ponto de TV cadastrado. Adicione em <a href="{% url 'configuration_equipment' %}">Equipamentos</a>.
                         </td>
                     </tr>
                     {% endfor %}
@@ -126,12 +138,12 @@
             </div>
             <div class="card-body">
                 <p class="card-text text-muted">
-                    Cada TV deve ser configurada no seu navegador (Smart TV, Raspberry Pi, Android TV, etc.) com a sua respectiva URL única listada acima.
+                    Cada TV deve ser configurada no seu navegador com a sua respectiva URL única listada acima.
                 </p>
                 <ul class="text-secondary small mb-0">
                     <li>Ao criar ou editar um slide em <strong>Novo Slide</strong>, você escolhe exatamente em quais TVs ele deve rodar.</li>
-                    <li>Conteúdos direcionados para a <em>Recepção</em> não aparecerão no <em>Refeitório</em> a menos que selecionados.</li>
-                    <li>As TVs atualizam novos slides, notícias, previsão do tempo e ônibus a cada 30 segundos em segundo plano.</li>
+                    <li>Equipamentos como <strong>P0MIDIAS1 a P0MIDIAS3</strong> podem operar em <strong>Modo Embed</strong> exclusivo (sem notícias intercaladas).</li>
+                    <li>As TVs atualizam novos slides, previsões e status automaticamente em tempo real sem travar a reprodução.</li>
                 </ul>
             </div>
         </div>
@@ -146,7 +158,7 @@
                 <ul class="text-secondary small mb-0">
                     <li><strong>Proporção:</strong> 16:9 (Horizontal) ou 9:16 (Totem Vertical).</li>
                     <li><strong>Resolução Recomendada:</strong> 1920x1080 (Full HD) ou 3840x2160 (4K).</li>
-                    <li><strong>Formatos:</strong> Imagens em JPG, PNG, WEBP ou Vídeos em MP4.</li>
+                    <li><strong>Formatos:</strong> Imagens (.jpg, .png, .webp), Vídeos (.mp4) ou Páginas Embed (URLs https://).</li>
                     <li><strong>Tempo de Leitura:</strong> Configure entre 8 a 15 segundos para boa leitura.</li>
                 </ul>
             </div>

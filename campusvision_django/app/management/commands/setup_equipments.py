@@ -5,7 +5,7 @@ from app.models import Settings, FeedStatus, Room
 from app.utils import get_settings
 
 class Command(BaseCommand):
-    help = "Cria/registra os equipamentos e feeds P1EQPT1 até P1EQPT6 no banco de dados."
+    help = "Cria/registra os equipamentos (P1EQPT1..P1EQPT6 com notícias e P0MIDIAS1..P0MIDIAS3 em modo Embed sem notícias)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -15,8 +15,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        new_equipments = [f"P1EQPT{i}" for i in range(1, 7)]
-        self.stdout.write(self.style.NOTICE(f"Cadastrando equipamentos: {', '.join(new_equipments)}"))
+        # Definição dos equipamentos e seus comportamentos
+        # P1EQPT1 a P1EQPT6: Notícias Ativas (show_news = True)
+        # P0MIDIAS1 a P0MIDIAS3: Modo Embed / Sem Notícias (show_news = False)
+        equipments_config = [
+            ("P1EQPT1", True),
+            ("P1EQPT2", True),
+            ("P1EQPT3", True),
+            ("P1EQPT4", True),
+            ("P1EQPT5", True),
+            ("P1EQPT6", True),
+            ("P0MIDIAS1", False),
+            ("P0MIDIAS2", False),
+            ("P0MIDIAS3", False),
+        ]
+
+        all_equipment_names = [eq[0] for eq in equipments_config]
+        self.stdout.write(self.style.NOTICE(f"Configurando equipamentos: {', '.join(all_equipment_names)}"))
 
         # 1. Atualizar Settings.feeds
         settings_obj = get_settings()
@@ -28,34 +43,42 @@ class Command(BaseCommand):
             current_feeds = []
 
         if options['replace']:
-            updated_feeds = new_equipments
+            updated_feeds = all_equipment_names
         else:
             updated_feeds = list(current_feeds)
-            for eq in new_equipments:
-                if eq not in updated_feeds:
-                    updated_feeds.append(eq)
+            for eq_name in all_equipment_names:
+                if eq_name not in updated_feeds:
+                    updated_feeds.append(eq_name)
 
         settings_obj.feeds = str(updated_feeds)
         settings_obj.save()
         self.stdout.write(self.style.SUCCESS(f"✅ Settings.feeds atualizado: {settings_obj.feeds}"))
 
-        # 2. Criar ou atualizar FeedStatus e Room
-        for eq in new_equipments:
+        # 2. Criar ou atualizar FeedStatus e Room para cada equipamento
+        for eq_name, enable_news in equipments_config:
             fs, created_fs = FeedStatus.objects.get_or_create(
-                feed_name=eq,
-                defaults={'last_access': timezone.now(), 'is_recently_updated': 1}
+                feed_name=eq_name,
+                defaults={
+                    'last_access': timezone.now(),
+                    'is_recently_updated': 1,
+                    'show_news': enable_news
+                }
             )
             if not created_fs:
+                # Mantém ou atualiza flag se for os P0MIDIAS
+                if not enable_news:
+                    fs.show_news = False
                 fs.is_recently_updated = 1
                 fs.last_access = timezone.now()
                 fs.save()
 
             room, created_room = Room.objects.get_or_create(
-                id=eq,
-                defaults={'title': f"Equipamento {eq}", 'status': 1}
+                id=eq_name,
+                defaults={'title': f"Equipamento {eq_name}", 'status': 1}
             )
 
+            news_status_str = "Com Notícias" if fs.show_news else "Sem Notícias (Modo Embed)"
             status_str = "criado" if created_fs else "atualizado"
-            self.stdout.write(self.style.SUCCESS(f" - [{eq}] FeedStatus e Room ({status_str}) com sucesso."))
+            self.stdout.write(self.style.SUCCESS(f" - [{eq_name}] FeedStatus e Room ({status_str}) -> {news_status_str}"))
 
-        self.stdout.write(self.style.SUCCESS("\n🎉 Todos os equipamentos P1EQPT1 até P1EQPT6 foram criados e estão prontos para uso!"))
+        self.stdout.write(self.style.SUCCESS("\n🎉 Todos os equipamentos (P1EQPT1..P1EQPT6 e P0MIDIAS1..P0MIDIAS3) configurados com sucesso!"))

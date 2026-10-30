@@ -89,8 +89,23 @@ def parse_date_safe(date_str):
             continue
     return None
 
-def get_slides(target_feed, interleave_news=True):
-    """Busca slides aprovados para um feed específico e intercala com páginas dinâmicas de notícias."""
+def is_news_enabled_for_feed(target_feed):
+    """Verifica se notícias estão habilitadas para o feed/equipamento especificado."""
+    if not target_feed:
+        return True
+    try:
+        fs = FeedStatus.objects.filter(feed_name__iexact=str(target_feed).strip()).first()
+        if fs is not None:
+            return bool(getattr(fs, 'show_news', True))
+    except Exception:
+        pass
+    return True
+
+def get_slides(target_feed, interleave_news=None):
+    """Busca slides aprovados para um feed específico e intercala com páginas dinâmicas de notícias (se habilitado)."""
+    if interleave_news is None:
+        interleave_news = is_news_enabled_for_feed(target_feed)
+
     user_slides = []
     today_date = timezone.now().date()
     for slide in Slide.objects.filter(approval='Approved').order_by('-id'):
@@ -180,22 +195,22 @@ def get_video(target_feed):
         start_date = parse_date_safe(slide.time_start)
         end_date = parse_date_safe(slide.time_end)
 
-        is_valid_date = True
+        is_valid = True
         if start_date and today_date < start_date:
-            is_valid_date = False
+            is_valid = False
         if end_date and today_date > end_date:
-            is_valid_date = False
+            is_valid = False
 
-        if (feed_matches(target_feed, slide.feeds) and is_valid_date and
-            slide.slide_path.lower().endswith(('.mp4', '.webm'))):
-            return slide.slide_path
-    return None
+        if feed_matches(target_feed, slide.feeds) and is_valid:
+            if slide.slide_path.lower().endswith(('.mp4', '.webm')):
+                return slide.slide_path
+    return ""
 
-def update_slide(slide_id, slide_name, time_start, time_end, feeds, reading_time=10):
-    """Atualiza dados de um slide."""
+def update_slide(id, title, time_start, time_end, feeds, reading_time=10):
+    """Atualiza dados do slide existente."""
     try:
-        slide_data = Slide.objects.get(id=slide_id)
-        slide_data.title = slide_name
+        slide_data = Slide.objects.get(id=id)
+        slide_data.title = title
         slide_data.time_start = str(time_start)
         slide_data.time_end = str(time_end)
         slide_data.feeds = str(feeds)
@@ -291,22 +306,26 @@ def signups_allowed():
 def update_feed_access(feed_name):
     """Atualiza o heartbeat de acesso ao feed."""
     try:
-        feed_status_entry, _ = FeedStatus.objects.get_or_create(
+        feed_status_entry, created = FeedStatus.objects.get_or_create(
             feed_name=feed_name,
-            defaults={'last_access': timezone.now(), 'is_recently_updated': 1}
+            defaults={'last_access': timezone.now(), 'is_recently_updated': 1, 'show_news': True}
         )
-        feed_status_entry.last_access = timezone.now()
-        feed_status_entry.is_recently_updated = 1
-        feed_status_entry.save()
+        if not created:
+            feed_status_entry.last_access = timezone.now()
+            feed_status_entry.is_recently_updated = 1
+            feed_status_entry.save(update_fields=['last_access', 'is_recently_updated'])
     except Exception as e:
         logger.warning("Falha ao registrar heartbeat do feed %s: %s", feed_name, e)
 
     limit_datetime = timezone.now() - timedelta(minutes=40)
-    FeedStatus.objects.filter(last_access__lt=limit_datetime).update(is_recently_updated=0)
+    try:
+        FeedStatus.objects.filter(last_access__lt=limit_datetime).update(is_recently_updated=0)
+    except Exception:
+        pass
 
 
 # ==============================================================================
-# NOVOS RECURSOS: NOTÍCIAS, CLIMA E DISTÂNCIA DE ÔNIBUS
+# RECURSOS DINÂMICOS: NOTÍCIAS, CLIMA E DISTÂNCIA DE ÔNIBUS
 # ==============================================================================
 
 def get_news_feed(limit=10):

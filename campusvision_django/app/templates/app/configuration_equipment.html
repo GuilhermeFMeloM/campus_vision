@@ -2,97 +2,153 @@
 {% load static %}
 
 {% block content %}
-<form method="POST" action="{% url 'configuration_equipment' %}">
-    {% csrf_token %}
-    <br>
-    <h3>Cadastrar Equipamento / Ponto de TV</h3>
-    <div class="mb-3">
-        <label for="message_text" class="form-label">Nome do Equipamento / Feed</label>
-        <input type="text" class="form-control" id="message_text" name="message_text" placeholder="Ex: TV Recepção Prédio A" required>
+<div class="container-fluid py-3">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="font-weight-bold text-dark mb-1"><i class="fa fa-television text-primary"></i> Gerenciamento de Equipamentos & Telas</h3>
+            <p class="text-muted mb-0">Cadastre pontos de exibição e controle permissões como a exibição de notícias intercaladas ou modo embed exclusivo.</p>
+        </div>
+        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+            <i class="fa fa-arrow-left"></i> Voltar ao Dashboard
+        </a>
     </div>
 
-    <button class="btn btn-primary" type="submit">Cadastrar</button>
-</form>
-<br>
-
-<div class="container">
-    <h3>Service Desk Operational Status</h3>
     <div class="row">
-        {% for feedstatus in rooms %}
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">{{ feedstatus.feed_name }}</h5>
-                    {% if feedstatus.is_recently_updated == 1 %}
-                    <span class="badge bg-success">Online</span>
-                    {% elif feedstatus.is_recently_updated == 0 %}
-                    <span class="badge bg-danger">Offline</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark">Problem</span>
-                    {% endif %}
+        <!-- 1. Formulário de Cadastro / Configuração -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 font-weight-bold"><i class="fa fa-plus-circle"></i> Cadastrar / Atualizar Equipamento</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{% url 'configuration_equipment' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add">
+
+                        <div class="mb-3">
+                            <label for="feed_name" class="form-label font-weight-bold">Nome / Identificador do Equipamento:</label>
+                            <input type="text" class="form-control" id="feed_name" name="feed_name" placeholder="Ex: P0MIDIAS1, P1EQPT1, Recepcao" required>
+                            <small class="text-muted">Use letras, números ou hífens sem espaços (ex: P0MIDIAS1).</small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label font-weight-bold d-block">Exibição de Notícias Dinâmicas:</label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="show_news" name="show_news" value="1" checked>
+                                <label class="form-check-label font-weight-bold" for="show_news">Intercalar Notícias RSS nesta TV</label>
+                            </div>
+                            <small class="text-muted d-block">
+                                Desmarque esta opção para telas dedicadas a <strong>Embed / Dashboards</strong> (como Power BI, Grafana) que não devem ser interrompidas por notícias.
+                            </small>
+                        </div>
+
+                        <button class="btn btn-primary w-100 py-2 font-weight-bold" type="submit">
+                            <i class="fa fa-save"></i> Salvar Equipamento
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card Informativo -->
+            <div class="card shadow-sm border-0 mt-3">
+                <div class="card-body bg-light">
+                    <h6 class="font-weight-bold text-dark"><i class="fa fa-info-circle text-info"></i> Modo Embed Exclusivo</h6>
+                    <p class="small text-muted mb-0">
+                        Quando as notícias estão <strong>desativadas</strong>, o televisor exibirá apenas o conteúdo cadastrado (como o link Embed ou slides próprios), sem intercalar notícias do G1/BBC.
+                    </p>
                 </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
-    <br>
-    <div class="row">
-        <div class="col-md-12">
-            <div class="list-group">
-                <div class="list-group-item">
-                    <h5 class="list-group-item-heading">
-                        Event Management
-                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access website and use site API">
-                            <i class="fa fa-question-circle"></i>
-                        </a>
-                    </h5>
-                    <p class="list-group-item-text">
-                        <span class="badge bg-success">Operational</span>
-                    </p>
+
+        <!-- 2. Lista de Equipamentos Cadastrados -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 font-weight-bold"><i class="fa fa-list"></i> Equipamentos Ativos no Sistema</h5>
+                    <span class="badge bg-primary fs-6">{{ rooms|length }} TV(s)</span>
                 </div>
-                <div class="list-group-item">
-                    <h5 class="list-group-item-heading">
-                        Transact
-                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access site using SSH terminal">
-                            <i class="fa fa-question-circle"></i>
-                        </a>
-                    </h5>
-                    <p class="list-group-item-text">
-                        <span class="badge bg-success">Operational</span>
-                    </p>
-                </div>
-                <div class="list-group-item">
-                    <h5 class="list-group-item-heading">
-                        Campus Dorm Services
-                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access database server and execute queries">
-                            <i class="fa fa-question-circle"></i>
-                        </a>
-                    </h5>
-                    <p class="list-group-item-text">
-                        <span class="badge bg-success">Operational</span>
-                    </p>
-                </div>
-                <div class="list-group-item">
-                    <h5 class="list-group-item-heading">
-                        Chapel
-                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Access database server and execute queries">
-                            <i class="fa fa-question-circle"></i>
-                        </a>
-                    </h5>
-                    <p class="list-group-item-text">
-                        <span class="badge bg-success">Operational</span>
-                    </p>
-                </div>
-                <div class="list-group-item">
-                    <h5 class="list-group-item-heading">
-                        External Communication
-                        <a href="#" data-bs-toggle="tooltip" data-bs-placement="bottom" title="KB, Documentation, Newsletter, Social Media, Bookings, Email, PR">
-                            <i class="fa fa-question-circle"></i>
-                        </a>
-                    </h5>
-                    <p class="list-group-item-text">
-                        <span class="badge bg-success">Operational</span>
-                    </p>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nome da TV</th>
+                                    <th>Status</th>
+                                    <th>Notícias Dinâmicas</th>
+                                    <th>Slides</th>
+                                    <th class="text-end">Ações & Links</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for room in rooms %}
+                                <tr>
+                                    <td>
+                                        <strong class="fs-6 text-dark">{{ room.feed_name }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {% if room.last_access %}
+                                                Último sinal: {{ room.last_access|date:"d/m/Y H:i:s" }}
+                                            {% else %}
+                                                Aguardando primeiro acesso
+                                            {% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% if room.is_online %}
+                                            <span class="badge bg-success p-2"><i class="fa fa-circle"></i> Online</span>
+                                        {% else %}
+                                            <span class="badge bg-danger p-2"><i class="fa fa-power-off"></i> Offline</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="toggle_news">
+                                            <input type="hidden" name="feed_name" value="{{ room.feed_name }}">
+                                            {% if room.show_news %}
+                                                <button type="submit" class="btn btn-outline-success btn-sm font-weight-bold" title="Clique para desativar as notícias nesta TV">
+                                                    <i class="fa fa-check-circle"></i> Notícias Ativadas
+                                                </button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-outline-warning btn-sm font-weight-bold" title="Clique para ativar as notícias nesta TV">
+                                                    <i class="fa fa-ban"></i> Notícias Desativadas (Embed)
+                                                </button>
+                                            {% endif %}
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info text-dark">
+                                            {{ room.slides_count }} slide(s)
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{{ room.url_horizontal }}" target="_blank" class="btn btn-primary btn-sm" title="Abrir transmissão padrão (Horizontal 16:9)">
+                                            <i class="fa fa-play-circle"></i> Abrir TV
+                                        </a>
+                                        <a href="{{ room.url_vertical }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Abrir transmissão para Totem (Vertical 9:16)">
+                                            <i class="fa fa-mobile"></i> Totem
+                                        </a>
+                                        <form method="POST" action="{% url 'configuration_equipment' %}" class="d-inline" onsubmit="return confirm('Tem certeza que deseja remover este equipamento?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="delete">
+                                            <input type="hidden" name="feed_name" value="{{ room.feed_name }}">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir equipamento">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        Nenhum equipamento cadastrado no momento.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
