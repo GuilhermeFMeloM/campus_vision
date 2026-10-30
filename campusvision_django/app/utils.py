@@ -25,45 +25,42 @@ def allowed_file(filename, allowed_ext=None):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_ext
 
 def feed_matches(target_feed, feeds_val):
-    """Verifica de forma case-insensitive e tolerante se o slide pertence ao feed especificado."""
-    if not target_feed:
+    """Verifica com estrita precisão se o slide pertence ao feed/equipamento especificado."""
+    if not target_feed or not feeds_val:
         return False
+
     target = str(target_feed).strip().lower()
 
-    # Se não houver feed definido no slide, assume broadcast universal
-    if not feeds_val or str(feeds_val).strip() in ('', 'None', 'null', '[]', "['']"):
-        return True
+    # 1. Parse de todos os feeds configurados no slide
+    assigned_feeds = set()
+    raw_str = str(feeds_val).strip()
 
-    feeds_str = str(feeds_val).strip().lower()
-
-    # Caso direto (ex: 'p1eqpt1' in "['p1eqpt1', 'p1eqpt2']")
-    if target in feeds_str:
-        return True
-
-    # Broadcast global/universal para todas as TVs
-    wildcards = {'all', '__all__', 'todas', 'todos', 'all_screens', 'global', '*', 'todas as telas'}
-    if any(w in feeds_str for w in wildcards):
-        return True
-
-    # Se o slide foi salvo no feed inicial 'default', permite reprodução
-    if target == 'default' or feeds_str in ('default', "['default']", "('default',)", "{'default'}"):
-        return True
-
-    # Parse de lista/tupla/conjunto em formato string
+    # Formato de lista Python / JSON: "['P1EQPT1', 'P0MIDIAS1']"
     import ast
     try:
-        parsed = ast.literal_eval(str(feeds_val))
+        parsed = ast.literal_eval(raw_str)
         if isinstance(parsed, (list, tuple, set)):
-            for item in parsed:
-                clean_item = str(item).strip().lower()
-                if clean_item == target or clean_item in wildcards or clean_item == 'default':
-                    return True
+            for f in parsed:
+                if f:
+                    assigned_feeds.add(str(f).strip().lower())
     except Exception:
         pass
 
-    # Separação por vírgula caso seja string plana "p1eqpt1, p1eqpt2"
-    tokens = [t.strip().strip("'\"[](){}").lower() for t in feeds_str.split(',') if t.strip()]
-    if any(t == target or t in wildcards or t == 'default' for t in tokens):
+    # Formato delimitado por vírgula ou string simples
+    if not assigned_feeds:
+        cleaned = raw_str.strip("[]()'\" {}")
+        for f in cleaned.split(','):
+            f_clean = f.strip().strip("'\"").lower()
+            if f_clean:
+                assigned_feeds.add(f_clean)
+
+    # 2. Correspondência direta ao equipamento da TV
+    if target in assigned_feeds:
+        return True
+
+    # 3. Broadcast universal para todas as telas ('all', 'todas', '*')
+    wildcards = {'all', '__all__', 'todas', 'todos', 'all_screens', 'global', '*'}
+    if any(w in assigned_feeds for w in wildcards):
         return True
 
     return False

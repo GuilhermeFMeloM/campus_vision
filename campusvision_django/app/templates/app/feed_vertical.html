@@ -373,11 +373,10 @@
         });
 
         // -------------------------------------------------------------
-        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO INSTANTÂNEO
+        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO SOB DEMANDA
         // -------------------------------------------------------------
         const FEED_NAME_V = "{{ title }}";
         let lastReloadIdV = parseInt("{{ reload_id|default:0 }}") || 0;
-        let lastSlidesSignatureV = "";
 
         function checkRemoteUpdatesV() {
             $.ajax({
@@ -395,16 +394,6 @@
                             window.location.reload(true);
                             return;
                         }
-                    }
-
-                    if (data.slides && Array.isArray(data.slides)) {
-                        const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
-                        if (lastSlidesSignatureV !== "" && currentSig !== lastSlidesSignatureV) {
-                            console.log("[SmartTV Vertical] Alteração na grade de slides. Recarregando...");
-                            window.location.reload(true);
-                            return;
-                        }
-                        lastSlidesSignatureV = currentSig;
                     }
                 },
                 error: function(err) {

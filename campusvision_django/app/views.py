@@ -51,6 +51,21 @@ def ensure_db_schema():
     except Exception:
         pass
 
+def get_all_registered_feeds():
+    """Retorna lista unificada de todos os equipamentos/feeds configurados."""
+    settings_obj = get_settings()
+    try:
+        feeds_list = ast.literal_eval(settings_obj.feeds)
+        if not isinstance(feeds_list, list):
+            feeds_list = ['Default']
+    except Exception:
+        feeds_list = ['Default']
+
+    status_feeds = list(FeedStatus.objects.values_list('feed_name', flat=True))
+    room_feeds = list(Room.objects.values_list('id', flat=True))
+    combined = list(dict.fromkeys(feeds_list + status_feeds + room_feeds))
+    return [str(f).strip() for f in combined if str(f).strip()]
+
 def get_current_user_name(request):
     """Retorna o nome do usuário autenticado ou perfil padrão."""
     if request.user.is_authenticated:
@@ -224,11 +239,7 @@ def profile(request):
     })
 
 def upload_file(request):
-    settings_obj = get_settings()
-    try:
-        feeds_list = ast.literal_eval(settings_obj.feeds)
-    except Exception:
-        feeds_list = ['Default']
+    feeds_list = get_all_registered_feeds()
 
     if request.method == 'GET':
         return render(request, 'app/upload.html', {
@@ -370,17 +381,26 @@ def moderate_post(request):
 
 def edit(request, id):
     slide = get_object_or_404(Slide, pk=id)
-    settings_obj = get_settings()
-    try:
-        feeds_list = ast.literal_eval(settings_obj.feeds)
-    except Exception:
-        feeds_list = ['Default']
+    feeds_list = get_all_registered_feeds()
+
+    # Parse dos feeds já associados ao slide
+    assigned_feeds = []
+    if slide.feeds:
+        try:
+            parsed = ast.literal_eval(slide.feeds)
+            if isinstance(parsed, (list, tuple, set)):
+                assigned_feeds = [str(f).strip() for f in parsed if f]
+            else:
+                assigned_feeds = [str(slide.feeds).strip()]
+        except Exception:
+            assigned_feeds = [f.strip().strip("'\"[]()") for f in str(slide.feeds).split(',') if f.strip()]
 
     if request.method == 'GET':
         return render(request, 'app/edit.html', {
             'title': 'Editar Slide',
             'slide_id': id,
             'slide': slide,
+            'assigned_feeds': assigned_feeds,
             'name': get_current_user_name(request),
             'mod_count': mod_counter(),
             'feeds': feeds_list

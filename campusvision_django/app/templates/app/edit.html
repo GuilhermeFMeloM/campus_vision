@@ -28,18 +28,37 @@
             </div>
          </div>
          <div class="mb-3">
-            <label class="form-label font-weight-bold">Equipamentos / Feeds:</label>
-            {% for feed in feeds %}
-            <div class="form-check">
-               <input class="form-check-input" type="checkbox" value="{{feed}}" name="feeds" id="feed_{{forloop.counter}}" {% if feed in slide.feeds %}checked{% endif %}>
-               <label class="form-check-label" for="feed_{{forloop.counter}}">{{feed}}</label>
+            <label class="form-label font-weight-bold">Equipamentos / Feeds de Exibição:</label>
+            <div class="p-3 border rounded bg-light">
+               <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="checkAll" onClick="toggleAllFeeds(this)"/>
+                  <label class="form-check-label font-weight-bold text-primary" for="checkAll">
+                     <i class="fa fa-check-square-o"></i> Selecionar Todas as Telas
+                  </label>
+               </div>
+               <hr class="my-2">
+               <div class="row">
+                  {% for feed in feeds %}
+                  <div class="col-md-6 mb-1">
+                     <div class="form-check">
+                        <input class="form-check-input feed-checkbox" type="checkbox" value="{{feed}}" name="feeds" id="feed_{{forloop.counter}}" {% if feed in assigned_feeds %}checked{% endif %}>
+                        <label class="form-check-label" for="feed_{{forloop.counter}}">{{feed}}</label>
+                     </div>
+                  </div>
+                  {% endfor %}
+               </div>
             </div>
-            {% endfor %}
          </div>
-         <button class="btn btn-primary" type="submit">Salvar Alterações</button>
+         <button class="btn btn-primary" type="submit"><i class="fa fa-save"></i> Salvar Alterações</button>
          <a href="{% url 'manager' %}" class="btn btn-secondary">Cancelar</a>
       </form>
    </div>
+   <script>
+   function toggleAllFeeds(source) {
+       const checkboxes = document.querySelectorAll('.feed-checkbox');
+       checkboxes.forEach(cb => cb.checked = source.checked);
+   }
+   </script>
    <div class="col-md-6 text-center">
       <h6 class="text-muted mb-3">Pré-visualização do Conteúdo</h6>
       {% if slide.slide_path|startswith:"http" %}

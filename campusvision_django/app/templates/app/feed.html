@@ -395,11 +395,10 @@
         });
 
         // -------------------------------------------------------------
-        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO INSTANTÂNEO
+        // 2. SINCRONIZAÇÃO EM TEMPO REAL & RECARREGAMENTO REMOTO SOB DEMANDA
         // -------------------------------------------------------------
         const FEED_NAME = "{{ title }}";
         let lastReloadId = parseInt("{{ reload_id|default:0 }}") || 0;
-        let lastSlidesSignature = "";
 
         function checkRemoteUpdates() {
             $.ajax({
@@ -410,7 +409,7 @@
                 success: function(data) {
                     if (!data) return;
 
-                    // A) Comando de Recarregamento Remoto Forçado
+                    // A) Comando de Recarregamento Remoto Forçado (Acionado via botão ou novo upload aprovado)
                     if (data.reload_id !== undefined && data.reload_id !== null) {
                         const serverReloadId = parseInt(data.reload_id);
                         if (serverReloadId > lastReloadId) {
@@ -420,18 +419,7 @@
                         }
                     }
 
-                    // B) Detecta se novos slides foram cadastrados ou removidos
-                    if (data.slides && Array.isArray(data.slides)) {
-                        const currentSig = data.slides.map(s => `${s.id || s.title}_${s.type}_${s.reading_time}`).join('|');
-                        if (lastSlidesSignature !== "" && currentSig !== lastSlidesSignature) {
-                            console.log("[SmartTV] Grade de conteúdos alterada. Atualizando TV...");
-                            window.location.reload(true);
-                            return;
-                        }
-                        lastSlidesSignature = currentSig;
-                    }
-
-                    // C) Alerta Urgente em Tempo Real
+                    // B) Alerta Urgente em Tempo Real (Atualização dinâmica sem reiniciar carrossel)
                     if (data.alert) {
                         if ($('#alertBar').length === 0) {
                             $('.tv-screen-container').prepend(`
